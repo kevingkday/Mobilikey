@@ -1,0 +1,16 @@
+# Mobilikey Local Development Environment Variables
+# Copy this file to .dev.vars for local Wrangler development.
+# Never commit .dev.vars or real secrets to version control.
+
+ENVIRONMENT="development"
+APP_URL="http://localhost:5173"
+
+# Transactional Email Configuration (Resend / Postmark / SendGrid compatible HTTP provider)
+EMAIL_PROVIDER="console"
+EMAIL_FROM="notifications@mobilikey.com"
+EMAIL_API_KEY=""
+
+# Optional Cloudflare Turnstile Secret Key (leave empty in local dev to use dev bypass)
+TURNSTILE_SECRET_KEY=""
+VITE_TURNSTILE_SITE_KEY=""
+
