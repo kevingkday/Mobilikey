@@ -342,6 +342,15 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
                 key={ann.id}
                 announcement={ann}
                 onDelete={handleDeleteAnnouncement}
+                onFollowChange={(compId, following) => {
+                  setAnnouncements((prev) =>
+                    prev.map((item) =>
+                      item.companyId === compId
+                        ? { ...item, isFollowingCompany: following }
+                        : item
+                    )
+                  );
+                }}
               />
             ))}
           </div>

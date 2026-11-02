@@ -17,7 +17,7 @@ import { AccessBadge, EntityAvatar } from '../components/ui/AccessBadge';
 import { AnnouncementCard } from '../components/announcements/AnnouncementCard';
 import { useAuth } from '../lib/auth-context';
 import { apiFetch } from '../lib/api';
-import { INDUSTRIES, COMPANY_SIZES } from '../../shared/constants';
+import { INDUSTRIES, COMPANY_SIZES, type AccessLevelValue } from '../../shared/constants';
 import type { AnnouncementItem, CompanyProfile } from '../../shared/types';
 
 export function CompaniesManagementPage() {
@@ -466,6 +466,27 @@ export function PublicCompanyPage() {
     }
   }
 
+  async function handleSetFollowerCompanyAccess(
+    followerUserId: string,
+    newLevel: AccessLevelValue
+  ) {
+    if (!company) return;
+    try {
+      await apiFetch('/api/messages/access', {
+        method: 'POST',
+        body: JSON.stringify({
+          senderUserId: followerUserId,
+          recipientType: 'company',
+          recipientId: company.id,
+          accessLevel: newLevel,
+        }),
+      });
+      await loadCompany();
+    } catch {
+      // ignore
+    }
+  }
+
   const isCompanyAdmin =
     company?.viewerRole === 'owner' || company?.viewerRole === 'admin';
 
@@ -694,6 +715,75 @@ export function PublicCompanyPage() {
             )}
             {memberError && <p className="text-xs text-red-700">{memberError}</p>}
           </div>
+
+          {/* Company Followers & Direct Inbox Access Grants (Visible to Company Admins) */}
+          {isCompanyAdmin && company.followers && (
+            <div className="rounded-md border border-[#E2E8F0] bg-white p-5 space-y-4">
+              <div>
+                <h2 className="text-sm font-bold text-[#1F2937]">
+                  Company Followers ({company.followers.length})
+                </h2>
+                <p className="text-xs text-[#64748B]">
+                  Professionals following {company.name}’s announcements. You can proactively grant
+                  Recognized (Level 2) or Direct (Level 3) access to {company.name}’s company inbox.
+                </p>
+              </div>
+
+              {company.followers.length === 0 ? (
+                <p className="text-xs text-[#64748B]">
+                  No professionals are following this company yet.
+                </p>
+              ) : (
+                <div className="divide-y divide-[#E2E8F0] border border-[#E2E8F0] rounded">
+                  {company.followers.map((flw) => (
+                    <div
+                      key={flw.userId}
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 hover:bg-[#F7F9FB]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <EntityAvatar
+                          name={flw.userName}
+                          avatarUrl={flw.userAvatarUrl}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <Link
+                            to={`/p/${flw.userSlug}`}
+                            className="text-xs font-semibold text-[#1F2937] hover:underline block truncate"
+                          >
+                            {flw.userName}
+                          </Link>
+                          <p className="text-[11px] text-[#64748B] truncate">
+                            {flw.userHeadline || flw.userCompany}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <AccessBadge level={flw.accessLevelToCompany} size="xs" />
+                        <select
+                          aria-label={`Set ${flw.userName} access to ${company.name}`}
+                          value={flw.accessLevelToCompany}
+                          onChange={(e) =>
+                            handleSetFollowerCompanyAccess(
+                              flw.userId,
+                              Number(e.target.value) as AccessLevelValue
+                            )
+                          }
+                          className="rounded border border-[#E2E8F0] bg-white px-2 py-1 text-xs font-medium text-[#1F2937]"
+                        >
+                          <option value={1}>Level 1 — General</option>
+                          <option value={2}>Level 2 — Recognized</option>
+                          <option value={3}>Level 3 — Direct</option>
+                          <option value={0}>Blocked</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Company Announcements */}
           <div className="space-y-3">

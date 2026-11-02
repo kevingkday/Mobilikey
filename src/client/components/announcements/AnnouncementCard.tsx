@@ -1,18 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, Flag, Trash2, Mail } from 'lucide-react';
+import { ExternalLink, Flag, Trash2, Mail, UserPlus, UserCheck } from 'lucide-react';
 import type { AnnouncementItem } from '../../../shared/types';
 import { EntityAvatar, formatRelativeTime } from '../ui/AccessBadge';
 import { useAuth } from '../../lib/auth-context';
+import { apiFetch } from '../../lib/api';
 
 export function AnnouncementCard({
   announcement,
   onDelete,
+  onFollowChange,
 }: {
   announcement: AnnouncementItem;
   onDelete?: (id: string) => void;
+  onFollowChange?: (companyId: string, following: boolean) => void;
 }) {
   const { user, openComposeModal, openReportModal } = useAuth();
+  const [isFollowingCompany, setIsFollowingCompany] = useState(
+    Boolean(announcement.isFollowingCompany)
+  );
+  const [togglingFollow, setTogglingFollow] = useState(false);
+
+  useEffect(() => {
+    setIsFollowingCompany(Boolean(announcement.isFollowingCompany));
+  }, [announcement.isFollowingCompany]);
 
   const canDelete =
     user &&
@@ -22,6 +33,26 @@ export function AnnouncementCard({
         (mc) =>
           mc.id === announcement.companyId && (mc.role === 'owner' || mc.role === 'admin')
       ));
+
+  async function handleToggleFollowCompany() {
+    if (!user || togglingFollow) return;
+    setTogglingFollow(true);
+    try {
+      const res = await apiFetch<{ following: boolean }>('/api/users/follow', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetType: 'company',
+          targetId: announcement.companyId,
+        }),
+      });
+      setIsFollowingCompany(res.following);
+      onFollowChange?.(announcement.companyId, res.following);
+    } catch {
+      // ignore
+    } finally {
+      setTogglingFollow(false);
+    }
+  }
 
   return (
     <article className="rounded-md border border-[#E2E8F0] bg-white p-4 transition-colors hover:border-[#CBD5E1]">
@@ -59,7 +90,36 @@ export function AnnouncementCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {user && (
+            <button
+              type="button"
+              disabled={togglingFollow}
+              onClick={handleToggleFollowCompany}
+              title={
+                isFollowingCompany
+                  ? `Following ${announcement.companyName}`
+                  : `Follow ${announcement.companyName}`
+              }
+              className={`inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
+                isFollowingCompany
+                  ? 'border-[#287D7D]/30 bg-[#287D7D]/10 text-[#1D5E5E]'
+                  : 'border-[#E2E8F0] bg-[#F7F9FB] text-[#526579] hover:text-[#1F2937]'
+              }`}
+            >
+              {isFollowingCompany ? (
+                <>
+                  <UserCheck className="h-3 w-3 text-[#287D7D]" />
+                  <span className="hidden sm:inline">Following</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-3 w-3" />
+                  <span className="hidden sm:inline">Follow</span>
+                </>
+              )}
+            </button>
+          )}
           {user && (
             <button
               type="button"
@@ -127,4 +187,3 @@ export function AnnouncementCard({
     </article>
   );
 }
-

@@ -88,6 +88,16 @@ export interface CompanyProfile {
     role: CompanyMemberRole;
     createdAt: number;
   }>;
+  followers?: Array<{
+    userId: string;
+    userName: string;
+    userSlug: string;
+    userHeadline: string;
+    userCompany: string;
+    userAvatarUrl: string | null;
+    followedAt: number;
+    accessLevelToCompany: AccessLevelValue;
+  }>;
 }
 
 export interface ConversationSummary {
@@ -150,6 +160,7 @@ export interface AnnouncementItem {
   externalUrl: string | null;
   moderationStatus: 'published' | 'flagged' | 'removed';
   createdAt: number;
+  isFollowingCompany?: boolean;
 }
 
 export interface AccessPermissionRecord {

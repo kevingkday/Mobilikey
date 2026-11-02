@@ -99,33 +99,27 @@ usersRoutes.get('/network/overview', requireAuth, async (c) => {
     .orderBy(desc(schema.users.createdAt))
     .limit(20);
 
-  // Enrich directory users with directional access levels
-  const enrichedDirectory = await Promise.all(
-    directoryUsers.map(async (u) => {
-      const viewerAccessToUser = await AccessService.getAccessLevel(
-        db,
-        viewer.id,
-        'user',
-        u.id
-      );
-      const userAccessToViewer = await AccessService.getAccessLevel(
-        db,
-        u.id,
-        'user',
-        viewer.id
-      );
-      return {
-        ...u,
-        viewerAccessToUser,
-        userAccessToViewer,
-      };
-    })
-  );
+  // Enrich followed users, followers, and directory users with directional access levels
+  const enrichUserAccess = async <T extends { id: string }>(u: T) => {
+    const viewerAccessToUser = await AccessService.getAccessLevel(db, viewer.id, 'user', u.id);
+    const userAccessToViewer = await AccessService.getAccessLevel(db, u.id, 'user', viewer.id);
+    return {
+      ...u,
+      viewerAccessToUser,
+      userAccessToViewer,
+    };
+  };
+
+  const [enrichedFollowedUsers, enrichedFollowers, enrichedDirectory] = await Promise.all([
+    Promise.all(followedUsers.map(enrichUserAccess)),
+    Promise.all(followers.map(enrichUserAccess)),
+    Promise.all(directoryUsers.map(enrichUserAccess)),
+  ]);
 
   return c.json({
     followedCompanies,
-    followedUsers,
-    followers,
+    followedUsers: enrichedFollowedUsers,
+    followers: enrichedFollowers,
     directoryUsers: enrichedDirectory,
   });
 });
@@ -201,6 +195,23 @@ usersRoutes.put('/me', requireAuth, async (c) => {
 
   const d = parsed.data;
   const now = Date.now();
+
+  // Check if position or companyName changed so we can notify followers with a factual career update
+  const prevRows = await db
+    .select({
+      companyName: schema.users.companyName,
+      position: schema.users.position,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, viewer.id))
+    .limit(1);
+
+  const prev = prevRows[0];
+  const roleOrCompanyChanged =
+    prev &&
+    ((d.position && d.position !== prev.position) ||
+      (d.companyName && d.companyName !== prev.companyName));
+
   await db
     .update(schema.users)
     .set({
@@ -221,6 +232,29 @@ usersRoutes.put('/me', requireAuth, async (c) => {
       updatedAt: now,
     })
     .where(eq(schema.users.id, viewer.id));
+
+  if (roleOrCompanyChanged && (d.position || d.companyName)) {
+    const followersRows = await db
+      .select({ followerUserId: schema.follows.followerUserId })
+      .from(schema.follows)
+      .where(
+        and(eq(schema.follows.targetType, 'user'), eq(schema.follows.targetUserId, viewer.id))
+      );
+
+    const roleSummary = [d.position, d.companyName].filter(Boolean).join(' at ');
+    for (const flw of followersRows) {
+      await db.insert(schema.notifications).values({
+        id: generateId('ntf'),
+        userId: flw.followerUserId,
+        type: 'account_notice',
+        title: `Career Update: ${d.name} is now ${roleSummary}.`,
+        body: d.headline || 'Factual role update from a professional you follow.',
+        referenceType: 'user',
+        referenceId: viewer.slug,
+        createdAt: now,
+      });
+    }
+  }
 
   const updated = await buildAuthenticatedUserPayload(db, viewer.id, viewer.csrfToken);
   return c.json({ user: updated });

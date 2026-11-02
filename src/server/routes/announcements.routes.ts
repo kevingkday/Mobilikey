@@ -30,7 +30,7 @@ announcementsRoutes.get('/', async (c) => {
   let followedCompanyIds: string[] = [];
   let followedUserIds: string[] = [];
 
-  if (feedMode === 'following' && viewer) {
+  if (viewer) {
     const flwRows = await db
       .select()
       .from(schema.follows)
@@ -112,6 +112,7 @@ announcementsRoutes.get('/', async (c) => {
     externalUrl: r.externalUrl,
     moderationStatus: r.moderationStatus as AnnouncementItem['moderationStatus'],
     createdAt: r.createdAt,
+    isFollowingCompany: followedCompanyIds.includes(r.companyId),
   }));
 
   return c.json({ announcements });

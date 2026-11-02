@@ -244,5 +244,124 @@ describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
     const adminJson = JSON.parse(adminText);
     expect(adminJson.stats.messagingActivity.totalMessagesSent).toBe(1);
   });
+
+  it('Supports following individuals and companies, company follower access management, and factual career change notifications', async () => {
+    const alice = await registerUser('Alice Vance', 'alice@meridian.com');
+    const bob = await registerUser('Bob Sterling', 'bob@sterling.com');
+
+    // Bob follows Alice
+    const followUserRes = await app.request(
+      '/api/users/follow',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: bob.cookie,
+          'X-CSRF-Token': bob.csrfToken,
+        },
+        body: JSON.stringify({
+          targetType: 'user',
+          targetId: alice.user.id,
+        }),
+      },
+      env
+    );
+    expect(followUserRes.status).toBe(200);
+    expect(((await followUserRes.json()) as any).following).toBe(true);
+
+    // Alice updates her position & companyName -> triggers factual career update notification for Bob
+    const updateProfileRes = await app.request(
+      '/api/users/me',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: alice.cookie,
+          'X-CSRF-Token': alice.csrfToken,
+        },
+        body: JSON.stringify({
+          name: 'Alice Vance',
+          headline: 'Senior Managing Partner at Apex Grid Capital',
+          companyName: 'Apex Grid Capital',
+          position: 'Senior Managing Partner',
+          location: 'Boston, MA',
+          industry: 'Financial Services',
+        }),
+      },
+      env
+    );
+    expect(updateProfileRes.status).toBe(200);
+
+    // Bob checks notifications and sees the factual Career Update notification
+    const bobNotifsRes = await app.request(
+      '/api/notifications',
+      {
+        method: 'GET',
+        headers: { Cookie: bob.cookie },
+      },
+      env
+    );
+    expect(bobNotifsRes.status).toBe(200);
+    const bobNotifs = ((await bobNotifsRes.json()) as any).notifications;
+    expect(
+      bobNotifs.some((n: any) =>
+        n.title.includes('Career Update: Alice Vance is now Senior Managing Partner at Apex Grid Capital')
+      )
+    ).toBe(true);
+
+    // Alice creates a company and Bob follows it
+    const compRes = await app.request(
+      '/api/companies',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: alice.cookie,
+          'X-CSRF-Token': alice.csrfToken,
+        },
+        body: JSON.stringify({
+          name: 'Apex Grid Capital',
+          description: 'Utility-scale transmission and grid storage investment firm.',
+          industry: 'Financial Services',
+          headquarters: 'Boston, MA',
+          companySize: '11-50 employees',
+        }),
+      },
+      env
+    );
+    const { companyId, slug } = (await compRes.json()) as any;
+
+    await app.request(
+      '/api/users/follow',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: bob.cookie,
+          'X-CSRF-Token': bob.csrfToken,
+        },
+        body: JSON.stringify({
+          targetType: 'company',
+          targetId: companyId,
+        }),
+      },
+      env
+    );
+
+    // Alice (as company owner) views the company page and sees Bob in the followers list with Level 1 access
+    const compDetailRes = await app.request(
+      `/api/companies/${slug}`,
+      {
+        method: 'GET',
+        headers: { Cookie: alice.cookie },
+      },
+      env
+    );
+    expect(compDetailRes.status).toBe(200);
+    const compDetail = (await compDetailRes.json()) as any;
+    expect(compDetail.company.followers).toHaveLength(1);
+    expect(compDetail.company.followers[0].userId).toBe(bob.user.id);
+    expect(compDetail.company.followers[0].accessLevelToCompany).toBe(1);
+  });
 });
 

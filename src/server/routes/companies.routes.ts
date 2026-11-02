@@ -248,6 +248,42 @@ companiesRoutes.get('/:slugOrId', async (c) => {
     .innerJoin(schema.users, eq(schema.companyMembers.userId, schema.users.id))
     .where(eq(schema.companyMembers.companyId, comp.id));
 
+  // If viewer is company owner or admin, also load company followers with their inbox access level
+  let companyFollowers: CompanyProfile['followers'] = undefined;
+  if (viewerRole === 'owner' || viewerRole === 'admin') {
+    const rawFollowers = await db
+      .select({
+        userId: schema.users.id,
+        userName: schema.users.name,
+        userSlug: schema.users.slug,
+        userHeadline: schema.users.headline,
+        userCompany: schema.users.companyName,
+        userAvatarUrl: schema.users.avatarUrl,
+        followedAt: schema.follows.createdAt,
+      })
+      .from(schema.follows)
+      .innerJoin(schema.users, eq(schema.follows.followerUserId, schema.users.id))
+      .where(
+        and(
+          eq(schema.follows.targetType, 'company'),
+          eq(schema.follows.targetCompanyId, comp.id)
+        )
+      )
+      .orderBy(desc(schema.follows.createdAt));
+
+    companyFollowers = await Promise.all(
+      rawFollowers.map(async (f) => ({
+        ...f,
+        accessLevelToCompany: await AccessService.getAccessLevel(
+          db,
+          f.userId,
+          'company',
+          comp.id
+        ),
+      }))
+    );
+  }
+
   // Fetch recent announcements for this company
   const recentAnnouncements = await db
     .select({
@@ -299,6 +335,7 @@ companiesRoutes.get('/:slugOrId', async (c) => {
       ...m,
       role: m.role as CompanyMemberRole,
     })),
+    followers: companyFollowers,
   };
 
   return c.json({
@@ -309,6 +346,8 @@ companiesRoutes.get('/:slugOrId', async (c) => {
       companySlug: comp.slug,
       companyLogoUrl: comp.logoUrl,
       companyIndustry: comp.industry,
+      moderationStatus: a.moderationStatus as 'published' | 'flagged' | 'removed',
+      isFollowingCompany: isFollowing,
     })),
   });
 });

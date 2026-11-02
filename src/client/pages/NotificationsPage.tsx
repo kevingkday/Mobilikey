@@ -110,6 +110,14 @@ export function NotificationsPage() {
                           Open Conversation →
                         </Link>
                       )}
+                      {n.referenceType === 'user' && n.referenceId && (
+                        <Link
+                          to={`/p/${n.referenceId}`}
+                          className="mt-1 inline-block text-xs font-medium text-[#287D7D] hover:underline"
+                        >
+                          View Professional Profile →
+                        </Link>
+                      )}
                     </div>
                   </div>
 
