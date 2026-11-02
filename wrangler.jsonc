@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "mobilikey-db",
-      "database_id": "00000000-0000-0000-0000-000000000001",
+      "database_id": "ca634215-33c6-4a9b-b3a0-d369d751fc52",
       "migrations_dir": "drizzle"
     }
   ],
