@@ -128,8 +128,19 @@ authRoutes.post('/signup', async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message || 'Invalid input' }, 400);
   }
 
-  const { name, email, password, headline, companyName, position, location, industry } =
-    parsed.data;
+  const {
+    name,
+    email,
+    password,
+    headline,
+    biography,
+    companyName,
+    position,
+    location,
+    industry,
+    website,
+    socialLinks,
+  } = parsed.data;
   const normalizedEmail = email.toLowerCase().trim();
 
   const existing = await db
@@ -155,13 +166,13 @@ authRoutes.post('/signup', async (c) => {
     emailVerifiedAt: null,
     name,
     headline: headline || [position, companyName].filter(Boolean).join(' at '),
-    biography: '',
+    biography: biography || '',
     location,
     companyName,
     position,
-    website: '',
+    website: website || '',
     industry,
-    socialLinksJson: '{}',
+    socialLinksJson: JSON.stringify(socialLinks || {}),
     avatarUrl: null,
     isPublic: 1,
     allowLevel1Messages: 1,

@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import app from '../src/server/index';
 import { createTestDb } from './test-db-helper';
 import type { Env } from '../src/server/env';
+import {
+  parseLinkedInPublicHtml,
+  parseProfileDocumentText,
+} from '../src/server/services/profile-import.service';
 
 describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
   let env: Env;
@@ -362,6 +366,73 @@ describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
     expect(compDetail.company.followers).toHaveLength(1);
     expect(compDetail.company.followers[0].userId).toBe(bob.user.id);
     expect(compDetail.company.followers[0].accessLevelToCompany).toBe(1);
+  });
+
+  it('Extracts structured profile credentials from LinkedIn public HTML, LinkedIn PDF layout, and CV/Resume documents via /api/users/import-profile', async () => {
+    // 1. Test LinkedIn Public HTML parser (OpenGraph + JSON-LD)
+    const sampleHtml = `
+      <html>
+        <head>
+          <title>Marcus Vance - Principal Regulatory Counsel - Vance Advisory Group | LinkedIn</title>
+          <meta property="og:title" content="Marcus Vance - Principal Regulatory Counsel - Vance Advisory Group | LinkedIn" />
+          <meta property="og:description" content="Independent regulatory counsel specializing in FERC transmission filings. · Experience: Vance Advisory Group · Location: Washington, DC" />
+        </head>
+        <body></body>
+      </html>
+    `;
+    const parsedHtml = parseLinkedInPublicHtml(
+      sampleHtml,
+      'https://www.linkedin.com/in/marcus-vance-91a8b',
+      'marcus-vance-91a8b'
+    );
+    expect(parsedHtml.name).toBe('Marcus Vance');
+    expect(parsedHtml.position).toBe('Principal Regulatory Counsel');
+    expect(parsedHtml.companyName).toBe('Vance Advisory Group');
+    expect(parsedHtml.location).toBe('Washington, DC');
+    expect(parsedHtml.socialLinks.linkedin).toBe('https://www.linkedin.com/in/marcus-vance-91a8b');
+
+    // 2. Test POST /api/users/import-profile with a LinkedIn PDF / CV text payload
+    const sampleCvText = `
+      Contact
+      www.linkedin.com/in/claire-dubois (LinkedIn)
+      claire.dubois@aegis-cyber.com
+      https://aegis-cyber.example.com
+
+      Claire Dubois
+      Director of Industrial OT Security at Aegis Industrial Security
+      Austin, TX
+
+      Summary
+      Securing SCADA telemetry, power generation facilities, and maritime logistics networks across North America.
+
+      Experience
+      Aegis Industrial Security
+      Director of Industrial OT Security
+      2022 - Present
+    `;
+
+    const importRes = await app.request(
+      '/api/users/import-profile',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawText: sampleCvText,
+        }),
+      },
+      env
+    );
+    expect(importRes.status).toBe(200);
+    const importData = (await importRes.json()) as any;
+    expect(importData.profile.name).toBe('Claire Dubois');
+    expect(importData.profile.email).toBe('claire.dubois@aegis-cyber.com');
+    expect(importData.profile.position).toBe('Director of Industrial OT Security');
+    expect(importData.profile.companyName).toBe('Aegis Industrial Security');
+    expect(importData.profile.location).toBe('Austin, TX');
+    expect(importData.profile.industry).toBe('Cybersecurity');
+    expect(importData.profile.socialLinks.linkedin).toBe(
+      'https://www.linkedin.com/in/claire-dubois'
+    );
   });
 });
 

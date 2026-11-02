@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { KeyRound, Lock, Mail, User, Building2 } from 'lucide-react';
 import { AppShell } from '../../components/layout/AppShell';
+import { ProfileImportCard } from '../../components/profile/ProfileImportCard';
 import { apiFetch } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
 import { INDUSTRIES } from '../../../shared/constants';
@@ -172,6 +173,10 @@ export function SignUpPage() {
   const [companyName, setCompanyName] = useState('');
   const [position, setPosition] = useState('');
   const [headline, setHeadline] = useState('');
+  const [biography, setBiography] = useState('');
+  const [website, setWebsite] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
   const [industry, setIndustry] = useState<string>(INDUSTRIES[0]);
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
@@ -192,6 +197,12 @@ export function SignUpPage() {
           companyName,
           position,
           headline: headline || [position, companyName].filter(Boolean).join(' at '),
+          biography,
+          website,
+          socialLinks: {
+            ...(linkedinUrl ? { linkedin: linkedinUrl } : {}),
+            ...(githubUrl ? { github: githubUrl } : {}),
+          },
           industry,
           location,
         }),
@@ -222,6 +233,25 @@ export function SignUpPage() {
               {error}
             </div>
           )}
+
+          <div className="mb-5">
+            <ProfileImportCard
+              compactTitle="Quick Fill from LinkedIn URL or CV / PDF"
+              onImport={(imported) => {
+                if (imported.name) setName(imported.name);
+                if (imported.email && !email) setEmail(imported.email);
+                if (imported.companyName) setCompanyName(imported.companyName);
+                if (imported.position) setPosition(imported.position);
+                if (imported.headline) setHeadline(imported.headline);
+                if (imported.location) setLocation(imported.location);
+                if (imported.industry) setIndustry(imported.industry);
+                if (imported.biography) setBiography(imported.biography);
+                if (imported.website) setWebsite(imported.website);
+                if (imported.socialLinks?.linkedin) setLinkedinUrl(imported.socialLinks.linkedin);
+                if (imported.socialLinks?.github) setGithubUrl(imported.socialLinks.github);
+              }}
+            />
+          </div>
 
           <form onSubmit={handleSignUp} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

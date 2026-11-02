@@ -14,8 +14,118 @@ import { generateId } from '../services/auth.service';
 import { buildAuthenticatedUserPayload } from './auth.routes';
 import type { PublicUserProfile } from '../../shared/types';
 import { ACCESS_LEVELS, type AccessLevelValue } from '../../shared/constants';
+import { checkRateLimit } from '../middleware/rateLimit';
+import {
+  extractTextFromDocumentBuffer,
+  importProfileFromLinkedInUrl,
+  mergeImportedProfiles,
+  parseProfileDocumentText,
+  type ImportedProfileData,
+} from '../services/profile-import.service';
 
 export const usersRoutes = new Hono<AppContext>();
+
+/**
+ * Imports professional profile data from a LinkedIn public URL, an uploaded PDF/CV/DOCX/TXT document,
+ * or pasted profile/resume text. Available on both Sign Up and My Profile pages.
+ */
+usersRoutes.post('/import-profile', async (c) => {
+  const db = c.get('db');
+  const ip = c.req.header('CF-Connecting-IP') || '127.0.0.1';
+
+  const rate = await checkRateLimit(db, `import_prof:${ip}`, 20, 15 * 60 * 1000);
+  if (!rate.allowed) {
+    return c.json({ error: 'Too many profile import requests. Please wait a few minutes.' }, 429);
+  }
+
+  let linkedinUrl = '';
+  let rawText = '';
+  let uploadedFileText = '';
+  let uploadedFileName = '';
+
+  const contentType = c.req.header('Content-Type') || '';
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.formData().catch(() => null);
+    if (!formData) {
+      return c.json({ error: 'Invalid form data upload.' }, 400);
+    }
+    linkedinUrl = String(formData.get('linkedinUrl') || '').trim();
+    rawText = String(formData.get('rawText') || '').trim();
+
+    const file = formData.get('file');
+    if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+      const f = file as File;
+      if (f.size > 5 * 1024 * 1024) {
+        return c.json({ error: 'Uploaded document must be under 5 MB.' }, 400);
+      }
+      uploadedFileName = f.name || 'document.pdf';
+      const buf = await f.arrayBuffer();
+      uploadedFileText = await extractTextFromDocumentBuffer(buf, uploadedFileName, f.type || '');
+    }
+  } else {
+    const body = await c.req.json().catch(() => ({}));
+    linkedinUrl = String(body?.linkedinUrl || '').trim();
+    rawText = String(body?.rawText || '').trim();
+  }
+
+  if (!linkedinUrl && !rawText && !uploadedFileText) {
+    return c.json(
+      {
+        error:
+          'Provide a LinkedIn public profile URL, upload a PDF/CV/DOCX file, or paste your profile text.',
+      },
+      400
+    );
+  }
+
+  let combinedProfile: ImportedProfileData = {
+    name: '',
+    email: '',
+    headline: '',
+    biography: '',
+    location: '',
+    companyName: '',
+    position: '',
+    website: '',
+    industry: '',
+    avatarUrl: null,
+    socialLinks: {},
+  };
+
+  const notices: string[] = [];
+  let source: 'linkedin_url' | 'linkedin_url_partial' | 'document' | 'combined' = 'document';
+
+  if (linkedinUrl) {
+    try {
+      const urlResult = await importProfileFromLinkedInUrl(linkedinUrl);
+      combinedProfile = mergeImportedProfiles(combinedProfile, urlResult.profile);
+      source = urlResult.source;
+      if (urlResult.notice) {
+        notices.push(urlResult.notice);
+      }
+    } catch (err: any) {
+      return c.json({ error: err.message || 'Invalid LinkedIn URL' }, 400);
+    }
+  }
+
+  const combinedDocText = [uploadedFileText, rawText].filter(Boolean).join('\n\n').trim();
+  if (combinedDocText) {
+    const docProfile = parseProfileDocumentText(combinedDocText);
+    combinedProfile = mergeImportedProfiles(combinedProfile, docProfile);
+    source = linkedinUrl ? 'combined' : 'document';
+    notices.push(
+      uploadedFileName
+        ? `Extracted profile details from ${uploadedFileName}. Review the imported fields below.`
+        : 'Extracted profile details from your pasted text. Review the imported fields below.'
+    );
+  }
+
+  return c.json({
+    profile: combinedProfile,
+    source,
+    notice: notices.join(' '),
+  });
+});
 
 usersRoutes.get('/network/overview', requireAuth, async (c) => {
   const db = c.get('db');

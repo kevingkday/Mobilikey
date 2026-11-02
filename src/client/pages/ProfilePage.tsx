@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AccessBadge, EntityAvatar } from '../components/ui/AccessBadge';
+import { ProfileImportCard } from '../components/profile/ProfileImportCard';
 import { useAuth } from '../lib/auth-context';
 import { apiFetch } from '../lib/api';
 import { INDUSTRIES, type AccessLevelValue } from '../../shared/constants';
@@ -119,6 +120,22 @@ export function MyProfilePage() {
             {error}
           </div>
         )}
+
+        <ProfileImportCard
+          onImport={(imported) => {
+            if (imported.name) setName(imported.name);
+            if (imported.headline) setHeadline(imported.headline);
+            if (imported.biography) setBiography(imported.biography);
+            if (imported.location) setLocation(imported.location);
+            if (imported.companyName) setCompanyName(imported.companyName);
+            if (imported.position) setPosition(imported.position);
+            if (imported.website) setWebsite(imported.website);
+            if (imported.industry) setIndustry(imported.industry);
+            if (imported.avatarUrl) setAvatarUrl(imported.avatarUrl);
+            if (imported.socialLinks?.linkedin) setLinkedin(imported.socialLinks.linkedin);
+            if (imported.socialLinks?.github) setGithub(imported.socialLinks.github);
+          }}
+        />
 
         <form
           onSubmit={handleSave}
