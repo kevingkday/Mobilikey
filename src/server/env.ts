@@ -11,6 +11,8 @@ export interface Env {
   EMAIL_FROM?: string;
   EMAIL_API_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export interface SessionUserContext {

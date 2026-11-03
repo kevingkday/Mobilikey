@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { setCookie, deleteCookie } from 'hono/cookie';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { eq, and, gt } from 'drizzle-orm';
 import type { AppContext } from '../env';
 import * as schema from '../db/schema';
@@ -26,6 +26,223 @@ import type { AuthenticatedUser, ManagedCompanySummary } from '../../shared/type
 export const authRoutes = new Hono<AppContext>();
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const OAUTH_STATE_COOKIE = 'mobilikey_oauth_state';
+
+/**
+ * Initiates Google OAuth 2.0 Authorization Code flow.
+ */
+authRoutes.get('/google', async (c) => {
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return c.redirect(
+      '/login?error=' +
+        encodeURIComponent(
+          'Google Sign-In is not configured yet (missing GOOGLE_CLIENT_ID secret).'
+        )
+    );
+  }
+
+  const reqUrl = new URL(c.req.url);
+  const redirectUri = `${reqUrl.origin}/api/auth/google/callback`;
+  const state = generateRandomToken(24);
+  const isProd = c.env.ENVIRONMENT === 'production';
+
+  setCookie(c, OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 600, // 10 minutes
+  });
+
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.searchParams.set('client_id', clientId);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', 'openid email profile');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('prompt', 'select_account');
+
+  return c.redirect(authUrl.toString());
+});
+
+/**
+ * Handles Google OAuth 2.0 callback, creates or signs in the user, and sets session cookie.
+ */
+authRoutes.get('/google/callback', async (c) => {
+  const db = c.get('db');
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return c.redirect(
+      '/login?error=' + encodeURIComponent('Google OAuth credentials are not configured.')
+    );
+  }
+
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const oauthError = c.req.query('error');
+  const storedState = getCookie(c, OAUTH_STATE_COOKIE);
+  deleteCookie(c, OAUTH_STATE_COOKIE, { path: '/' });
+
+  if (oauthError) {
+    return c.redirect('/login?error=' + encodeURIComponent(`Google Sign-In cancelled (${oauthError}).`));
+  }
+
+  if (!code || !state || !storedState || state !== storedState) {
+    return c.redirect(
+      '/login?error=' + encodeURIComponent('Invalid or expired OAuth state. Please try again.')
+    );
+  }
+
+  const reqUrl = new URL(c.req.url);
+  const redirectUri = `${reqUrl.origin}/api/auth/google/callback`;
+
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      return c.redirect(
+        '/login?error=' + encodeURIComponent('Failed to exchange authorization code with Google.')
+      );
+    }
+
+    const tokenData = (await tokenRes.json()) as { access_token?: string };
+    if (!tokenData.access_token) {
+      return c.redirect(
+        '/login?error=' + encodeURIComponent('No access token returned by Google.')
+      );
+    }
+
+    const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (!userRes.ok) {
+      return c.redirect(
+        '/login?error=' + encodeURIComponent('Unable to fetch user profile from Google.')
+      );
+    }
+
+    const googleUser = (await userRes.json()) as {
+      sub: string;
+      email?: string;
+      email_verified?: boolean;
+      name?: string;
+      picture?: string;
+    };
+
+    if (!googleUser.email) {
+      return c.redirect(
+        '/login?error=' + encodeURIComponent('Your Google account did not provide an email address.')
+      );
+    }
+
+    const normalizedEmail = googleUser.email.toLowerCase().trim();
+    const existingRows = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, normalizedEmail))
+      .limit(1);
+
+    const now = Date.now();
+    let userId: string;
+    let isNewUser = false;
+
+    if (existingRows[0]) {
+      const existing = existingRows[0];
+      if (existing.status !== 'active') {
+        return c.redirect(
+          '/login?error=' + encodeURIComponent('This account has been suspended or deactivated.')
+        );
+      }
+      userId = existing.id;
+
+      // Backfill email verification and avatar if missing
+      await db
+        .update(schema.users)
+        .set({
+          emailVerifiedAt: existing.emailVerifiedAt || (googleUser.email_verified ? now : null),
+          avatarUrl: existing.avatarUrl || googleUser.picture || null,
+          updatedAt: now,
+        })
+        .where(eq(schema.users.id, userId));
+    } else {
+      isNewUser = true;
+      userId = generateId('usr');
+      const displayName = (googleUser.name || normalizedEmail.split('@')[0]).trim();
+      const slug = slugify(displayName);
+      const randomPasswordHash = await hashPassword(generateRandomToken(32));
+
+      await db.insert(schema.users).values({
+        id: userId,
+        slug,
+        email: normalizedEmail,
+        passwordHash: randomPasswordHash,
+        emailVerifiedAt: googleUser.email_verified ? now : null,
+        name: displayName,
+        headline: '',
+        biography: '',
+        location: '',
+        companyName: '',
+        position: '',
+        website: '',
+        industry: '',
+        socialLinksJson: '{}',
+        avatarUrl: googleUser.picture || null,
+        isPublic: 1,
+        allowLevel1Messages: 1,
+        systemRole: 'user',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Create session cookie
+    const rawSessionToken = generateRandomToken(32);
+    const sessionTokenHash = await sha256Hex(rawSessionToken);
+    const csrfToken = generateRandomToken(24);
+    const ip = c.req.header('CF-Connecting-IP') || '127.0.0.1';
+
+    await db.insert(schema.sessions).values({
+      id: generateId('ses'),
+      userId,
+      sessionTokenHash,
+      csrfToken,
+      ipAddress: ip,
+      userAgent: c.req.header('User-Agent') || '',
+      expiresAt: now + SESSION_TTL_MS,
+      createdAt: now,
+    });
+
+    const isProd = c.env.ENVIRONMENT === 'production';
+    setCookie(c, SESSION_COOKIE_NAME, rawSessionToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    return c.redirect(isNewUser ? '/profile' : '/feed');
+  } catch {
+    return c.redirect(
+      '/login?error=' + encodeURIComponent('An unexpected error occurred during Google Sign-In.')
+    );
+  }
+});
 
 export async function buildAuthenticatedUserPayload(
   db: AppContext['Variables']['db'],
