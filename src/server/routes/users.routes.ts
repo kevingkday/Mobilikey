@@ -11,6 +11,7 @@ import {
 import { requireAuth, SESSION_COOKIE_NAME } from '../middleware/auth';
 import { AccessService } from '../services/access.service';
 import { generateId } from '../services/auth.service';
+import { forwardInboundMessageToEmail } from '../services/email.service';
 import { buildAuthenticatedUserPayload } from './auth.routes';
 import type { PublicUserProfile } from '../../shared/types';
 import { ACCESS_LEVELS, type AccessLevelValue } from '../../shared/constants';
@@ -376,7 +377,10 @@ usersRoutes.put('/me/settings', requireAuth, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = updateSettingsSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: 'Invalid settings data' }, 400);
+    return c.json(
+      { error: parsed.error.issues[0]?.message || 'Invalid settings data' },
+      400
+    );
   }
 
   const d = parsed.data;
@@ -393,6 +397,53 @@ usersRoutes.put('/me/settings', requireAuth, async (c) => {
 
   const updated = await buildAuthenticatedUserPayload(db, viewer.id, viewer.csrfToken);
   return c.json({ user: updated });
+});
+
+usersRoutes.post('/me/test-forwarding', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const level = Number(body?.level);
+  if (![1, 2, 3].includes(level)) {
+    return c.json({ error: 'Select a valid access level (1, 2, or 3).' }, 400);
+  }
+
+  const userRows = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, viewer.id))
+    .limit(1);
+  if (!userRows[0]) {
+    return c.json({ error: 'User not found.' }, 404);
+  }
+
+  const result = await forwardInboundMessageToEmail(c.env, {
+    recipientPrimaryEmail: userRows[0].email,
+    recipientName: userRows[0].name,
+    recipientEmailNotifPrefsJson: userRows[0].emailNotifPrefsJson,
+    senderName: 'Mobilikey Routing Verification',
+    senderSubtitle: 'System Test · Tiered Inbox Forwarding',
+    senderAccessLevel: level as AccessLevelValue,
+    subject: `Level ${level} Forwarding Verification`,
+    body: `This is a test message confirming your Level ${level} email forwarding rule on Mobilikey.`,
+    conversationId: 'test_routing',
+  });
+
+  if (!result.forwarded || !result.targetEmail) {
+    return c.json(
+      {
+        error: `Email forwarding is currently disabled for Level ${level}. Enable the toggle and save your settings first.`,
+      },
+      400
+    );
+  }
+
+  return c.json({
+    ok: true,
+    level,
+    targetEmail: result.targetEmail,
+    provider: result.provider,
+  });
 });
 
 usersRoutes.delete('/me', requireAuth, async (c) => {

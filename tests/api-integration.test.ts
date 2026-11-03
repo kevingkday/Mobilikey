@@ -434,5 +434,164 @@ describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
       'https://www.linkedin.com/in/claire-dubois'
     );
   });
+
+  it('Routes inbound messages to distinct per-level forwarding email addresses (Level 1 info@, Level 2 work@, Level 3 personal@) and ensures senders appear in Followers', async () => {
+    const alice = await registerUser('Alice Vance', 'alice@meridian.com');
+    const bob = await registerUser('Bob Sterling', 'bob@sterling.com');
+
+    // 1. Alice configures distinct per-level email forwarding addresses for Level 1, Level 2, and Level 3
+    const saveSettingsRes = await app.request(
+      '/api/users/me/settings',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: alice.cookie,
+          'X-CSRF-Token': alice.csrfToken,
+        },
+        body: JSON.stringify({
+          isPublic: true,
+          allowLevel1Messages: true,
+          emailNotifPrefs: {
+            directMessages: true,
+            recognizedMessages: true,
+            accessPromotions: true,
+            generalRequests: true,
+            forwarding: {
+              level1: { enabled: true, email: 'info@meridian.com' },
+              level2: { enabled: true, email: 'deals@meridian.com' },
+              level3: { enabled: true, email: 'alice.personal@gmail.com' },
+            },
+          },
+        }),
+      },
+      env
+    );
+    expect(saveSettingsRes.status).toBe(200);
+    const savedUser = ((await saveSettingsRes.json()) as any).user;
+    expect(savedUser.emailNotifPrefs.forwarding.level1.email).toBe('info@meridian.com');
+    expect(savedUser.emailNotifPrefs.forwarding.level2.email).toBe('deals@meridian.com');
+    expect(savedUser.emailNotifPrefs.forwarding.level3.email).toBe('alice.personal@gmail.com');
+
+    // 2. Bob sends a message at default Level 1 -> routes to info@meridian.com and records Bob as a follower
+    const l1MsgRes = await app.request(
+      '/api/messages/conversations',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: bob.cookie,
+          'X-CSRF-Token': bob.csrfToken,
+        },
+        body: JSON.stringify({
+          recipientType: 'user',
+          recipientId: alice.user.id,
+          subject: 'Initial Introduction',
+          body: 'Hello Alice, reaching out at Level 1.',
+        }),
+      },
+      env
+    );
+    expect(l1MsgRes.status).toBe(201);
+    const l1Data = (await l1MsgRes.json()) as any;
+    expect(l1Data.senderAccessLevel).toBe(1);
+    expect(l1Data.forwardedToEmail).toBe('info@meridian.com');
+
+    // Verify Bob appears in Alice's Followers list so Alice can control his Level 1-3 access
+    const netRes = await app.request(
+      '/api/users/network/overview',
+      {
+        method: 'GET',
+        headers: { Cookie: alice.cookie },
+      },
+      env
+    );
+    const netData = (await netRes.json()) as any;
+    expect(netData.followers.some((f: any) => f.id === bob.user.id)).toBe(true);
+
+    // 3. Alice promotes Bob to Level 2 (Recognized Access) -> Bob's message routes to deals@meridian.com
+    await app.request(
+      '/api/messages/access',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: alice.cookie,
+          'X-CSRF-Token': alice.csrfToken,
+        },
+        body: JSON.stringify({
+          senderUserId: bob.user.id,
+          recipientType: 'user',
+          recipientId: alice.user.id,
+          accessLevel: 2,
+        }),
+      },
+      env
+    );
+
+    const l2MsgRes = await app.request(
+      '/api/messages/conversations',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: bob.cookie,
+          'X-CSRF-Token': bob.csrfToken,
+        },
+        body: JSON.stringify({
+          recipientType: 'user',
+          recipientId: alice.user.id,
+          body: 'Follow-up at Level 2 Recognized Access.',
+        }),
+      },
+      env
+    );
+    expect(l2MsgRes.status).toBe(201);
+    const l2Data = (await l2MsgRes.json()) as any;
+    expect(l2Data.senderAccessLevel).toBe(2);
+    expect(l2Data.forwardedToEmail).toBe('deals@meridian.com');
+
+    // 4. Alice promotes Bob to Level 3 (Direct Access) -> Bob's message routes to alice.personal@gmail.com
+    await app.request(
+      '/api/messages/access',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: alice.cookie,
+          'X-CSRF-Token': alice.csrfToken,
+        },
+        body: JSON.stringify({
+          senderUserId: bob.user.id,
+          recipientType: 'user',
+          recipientId: alice.user.id,
+          accessLevel: 3,
+        }),
+      },
+      env
+    );
+
+    const l3MsgRes = await app.request(
+      '/api/messages/conversations',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: bob.cookie,
+          'X-CSRF-Token': bob.csrfToken,
+        },
+        body: JSON.stringify({
+          recipientType: 'user',
+          recipientId: alice.user.id,
+          body: 'Urgent note at Level 3 Direct Access.',
+        }),
+      },
+      env
+    );
+    expect(l3MsgRes.status).toBe(201);
+    const l3Data = (await l3MsgRes.json()) as any;
+    expect(l3Data.senderAccessLevel).toBe(3);
+    expect(l3Data.forwardedToEmail).toBe('alice.personal@gmail.com');
+  });
 });
 

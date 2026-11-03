@@ -20,7 +20,10 @@ import {
 import { SESSION_COOKIE_NAME, requireAuth } from '../middleware/auth';
 import { checkRateLimit } from '../middleware/rateLimit';
 import { RATE_LIMITS } from '../../shared/constants';
-import { sendTransactionalEmail } from '../services/email.service';
+import {
+  sendTransactionalEmail,
+  resolveEmailNotifAndForwardingPrefs,
+} from '../services/email.service';
 import type { AuthenticatedUser, ManagedCompanySummary } from '../../shared/types';
 
 export const authRoutes = new Hono<AppContext>();
@@ -287,17 +290,7 @@ export async function buildAuthenticatedUserPayload(
     socialLinks = {};
   }
 
-  let emailNotifPrefs = {
-    directMessages: true,
-    recognizedMessages: true,
-    accessPromotions: true,
-    generalRequests: false,
-  };
-  try {
-    emailNotifPrefs = { ...emailNotifPrefs, ...JSON.parse(u.emailNotifPrefsJson || '{}') };
-  } catch {
-    // keep default
-  }
+  const emailNotifPrefs = resolveEmailNotifAndForwardingPrefs(u.emailNotifPrefsJson);
 
   return {
     id: u.id,

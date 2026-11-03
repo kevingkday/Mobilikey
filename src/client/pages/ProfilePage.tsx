@@ -446,12 +446,14 @@ export function PublicProfilePage() {
                         name: profile.name,
                         subtitle: profile.headline,
                         accessLevel: profile.viewerAccessToUser ?? 1,
+                        isFollowing: Boolean(profile.isFollowing),
+                        onFollowed: loadProfile,
                       })
                     }
                     className="inline-flex items-center gap-1.5 rounded bg-[#243B53] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40]"
                   >
                     <Mail className="h-3.5 w-3.5" />
-                    <span>Message</span>
+                    <span>{profile.isFollowing ? 'Message' : 'Follow & Message'}</span>
                   </button>
 
                   <button

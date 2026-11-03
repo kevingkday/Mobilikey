@@ -374,12 +374,14 @@ export function CompaniesManagementPage() {
                               name: comp.name,
                               subtitle: comp.industry,
                               accessLevel: comp.viewerAccessToCompany ?? 1,
+                              isFollowing: Boolean(comp.isFollowing),
+                              onFollowed: loadCompanies,
                             })
                           }
                           className="inline-flex items-center gap-1 rounded bg-[#243B53] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1B2D40]"
                         >
                           <Mail className="h-3 w-3" />
-                          <span>Message</span>
+                          <span>{comp.isFollowing ? 'Message' : 'Follow & Message'}</span>
                         </button>
                       )}
                     </div>
@@ -588,12 +590,14 @@ export function PublicCompanyPage() {
                           name: company.name,
                           subtitle: company.industry,
                           accessLevel: company.viewerAccessToCompany ?? 1,
+                          isFollowing: Boolean(company.isFollowing),
+                          onFollowed: loadCompany,
                         })
                       }
                       className="inline-flex items-center gap-1.5 rounded bg-[#243B53] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40]"
                     >
                       <Mail className="h-3.5 w-3.5" />
-                      <span>Message Company</span>
+                      <span>{company.isFollowing ? 'Message Company' : 'Follow & Message'}</span>
                     </button>
 
                     <button

@@ -6,11 +6,24 @@ export type AccountStatus = 'active' | 'suspended' | 'deleted';
 export type CompanyMemberRole = 'owner' | 'admin' | 'publisher';
 export type InboxFolder = 'general' | 'recognized' | 'direct' | 'sent' | 'archived';
 
+export interface EmailForwardingTierConfig {
+  enabled: boolean;
+  /** Destination email for this access level (e.g. info@company.com for L1, work@ for L2, personal@ for L3). Empty string falls back to primary account email. */
+  email: string;
+}
+
+export interface EmailForwardingPrefs {
+  level1: EmailForwardingTierConfig;
+  level2: EmailForwardingTierConfig;
+  level3: EmailForwardingTierConfig;
+}
+
 export interface EmailNotifPrefs {
   directMessages: boolean;
   recognizedMessages: boolean;
   accessPromotions: boolean;
   generalRequests: boolean;
+  forwarding?: EmailForwardingPrefs;
 }
 
 export interface SocialLinks {

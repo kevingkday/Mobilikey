@@ -79,6 +79,20 @@ export const updateProfileSchema = z.object({
   allowLevel1Messages: z.boolean().optional(),
 });
 
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .max(255)
+  .refine(
+    (val) => val === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+    'Must be a valid email address or left blank to use your primary account email'
+  );
+
+const emailForwardingTierSchema = z.object({
+  enabled: z.boolean(),
+  email: optionalEmailSchema.optional().default(''),
+});
+
 export const updateSettingsSchema = z.object({
   isPublic: z.boolean(),
   allowLevel1Messages: z.boolean(),
@@ -87,6 +101,13 @@ export const updateSettingsSchema = z.object({
     recognizedMessages: z.boolean(),
     accessPromotions: z.boolean(),
     generalRequests: z.boolean(),
+    forwarding: z
+      .object({
+        level1: emailForwardingTierSchema,
+        level2: emailForwardingTierSchema,
+        level3: emailForwardingTierSchema,
+      })
+      .optional(),
   }),
 });
 

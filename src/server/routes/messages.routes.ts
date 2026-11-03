@@ -109,6 +109,7 @@ messagesRoutes.post('/conversations', async (c) => {
       recipientId: parsed.data.recipientId,
       subject: parsed.data.subject,
       body: parsed.data.body,
+      env: c.env,
     });
     return c.json(result, 201);
   } catch (err) {
@@ -168,6 +169,7 @@ messagesRoutes.post('/conversations/:id/reply', async (c) => {
       conversationId,
       body: parsed.data.body,
       sendAsCompanyId: parsed.data.sendAsCompanyId,
+      env: c.env,
     });
     return c.json(result, 201);
   } catch (err) {

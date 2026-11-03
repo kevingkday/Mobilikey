@@ -8,6 +8,8 @@ export interface ComposeRecipientTarget {
   name: string;
   subtitle?: string;
   accessLevel?: number;
+  isFollowing?: boolean;
+  onFollowed?: () => void;
 }
 
 export interface UnreadSummary {

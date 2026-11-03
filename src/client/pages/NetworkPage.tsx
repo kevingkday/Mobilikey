@@ -149,12 +149,14 @@ export function NetworkPage() {
                     .filter(Boolean)
                     .join(' · '),
                   accessLevel: myAccessToThem,
+                  isFollowing,
+                  onFollowed: loadNetwork,
                 })
               }
               className="inline-flex items-center gap-1 rounded bg-[#243B53] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1B2D40]"
             >
               <Mail className="h-3 w-3" />
-              <span>Message</span>
+              <span>{isFollowing ? 'Message' : 'Follow & Message'}</span>
             </button>
           </div>
         </div>

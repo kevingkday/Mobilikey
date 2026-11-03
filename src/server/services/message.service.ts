@@ -15,6 +15,8 @@ import type {
 import { AccessControlError, AccessService } from './access.service';
 import { generateId } from './auth.service';
 import { checkRateLimit } from '../middleware/rateLimit';
+import { forwardInboundMessageToEmail } from './email.service';
+import type { Env } from '../env';
 
 export interface InboxTarget {
   type: EntityType;
@@ -85,9 +87,24 @@ export class MessageService {
       recipientId: string;
       subject?: string;
       body: string;
+      requireFollowBeforeMessage?: boolean;
+      env?: Partial<Env>;
     }
-  ): Promise<{ conversationId: string; messageId: string; senderAccessLevel: AccessLevelValue }> {
-    const { senderUserId, recipientType, recipientId, subject = '', body } = params;
+  ): Promise<{
+    conversationId: string;
+    messageId: string;
+    senderAccessLevel: AccessLevelValue;
+    forwardedToEmail: string | null;
+  }> {
+    const {
+      senderUserId,
+      recipientType,
+      recipientId,
+      subject = '',
+      body,
+      requireFollowBeforeMessage = false,
+      env = {},
+    } = params;
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > 4000) {
       throw new AccessControlError('Message body must be between 1 and 4,000 characters.', 400);
@@ -109,6 +126,9 @@ export class MessageService {
 
     // Verify recipient exists and is active
     let recipientAllowLevel1 = true;
+    let recipientUserRow: typeof schema.users.$inferSelect | null = null;
+    let recipientCompanyRow: typeof schema.companies.$inferSelect | null = null;
+
     if (recipientType === 'user') {
       const recRows = await db
         .select()
@@ -118,6 +138,7 @@ export class MessageService {
       if (!recRows[0] || recRows[0].status !== 'active') {
         throw new AccessControlError('Recipient user is not available.', 404);
       }
+      recipientUserRow = recRows[0];
       recipientAllowLevel1 = recRows[0].allowLevel1Messages === 1;
     } else {
       const compRows = await db
@@ -128,6 +149,7 @@ export class MessageService {
       if (!compRows[0] || compRows[0].status !== 'active') {
         throw new AccessControlError('Recipient company is not available.', 404);
       }
+      recipientCompanyRow = compRows[0];
     }
 
     // Check directional access level: sender -> recipient
@@ -161,6 +183,29 @@ export class MessageService {
     if (senderAccessLevel === ACCESS_LEVELS.GENERAL && !recipientAllowLevel1) {
       throw new AccessControlError(
         'This professional is currently only accepting messages from Recognized (Level 2) and Direct (Level 3) contacts.',
+        403
+      );
+    }
+
+    // Check or ensure follow relationship so the recipient always sees the sender in their Followers list
+    // and can control their Level 1 - 3 access.
+    const followCondition =
+      recipientType === 'user'
+        ? and(
+            eq(schema.follows.followerUserId, senderUserId),
+            eq(schema.follows.targetType, 'user'),
+            eq(schema.follows.targetUserId, recipientId)
+          )
+        : and(
+            eq(schema.follows.followerUserId, senderUserId),
+            eq(schema.follows.targetType, 'company'),
+            eq(schema.follows.targetCompanyId, recipientId)
+          );
+    const existingFollow = await db.select().from(schema.follows).where(followCondition).limit(1);
+
+    if (!existingFollow[0] && requireFollowBeforeMessage) {
+      throw new AccessControlError(
+        'You must follow this recipient before sending a message. Following starts you at Level 1 — General Access so the recipient can see you in their Followers list and manage your access level (Level 1–3).',
         403
       );
     }
@@ -215,7 +260,21 @@ export class MessageService {
     const now = Date.now();
     const preview = trimmedBody.slice(0, 140);
 
+    // Ensure sender is recorded in follows so the recipient always sees them in their Followers list
+    // and can manage their Level 1 - 3 access level.
+    if (!existingFollow[0]) {
+      await db.insert(schema.follows).values({
+        id: generateId('flw'),
+        followerUserId: senderUserId,
+        targetType: recipientType,
+        targetUserId: recipientType === 'user' ? recipientId : null,
+        targetCompanyId: recipientType === 'company' ? recipientId : null,
+        createdAt: now,
+      });
+    }
+
     let conversationId: string;
+    const normalizedSubject = subject.trim().slice(0, 140);
     if (existingConv) {
       conversationId = existingConv.id;
       const isInitiator = existingConv.initiatorUserId === senderUserId;
@@ -235,7 +294,7 @@ export class MessageService {
       conversationId = generateId('cnv');
       await db.insert(schema.conversations).values({
         id: conversationId,
-        subject: subject.trim().slice(0, 140),
+        subject: normalizedSubject,
         initiatorUserId: senderUserId,
         recipientType,
         recipientUserId: recipientType === 'user' ? recipientId : null,
@@ -274,7 +333,63 @@ export class MessageService {
       });
     }
 
-    return { conversationId, messageId, senderAccessLevel };
+    // Per-Level Email Forwarding (Level 1 -> e.g. info@, Level 2 -> e.g. work@, Level 3 -> e.g. personal@)
+    let forwardedToEmail: string | null = null;
+    const senderSubtitle =
+      [senderRows[0].position, senderRows[0].companyName].filter(Boolean).join(' · ') ||
+      senderRows[0].headline;
+
+    if (recipientType === 'user' && recipientUserRow) {
+      const fwdResult = await forwardInboundMessageToEmail(env, {
+        recipientPrimaryEmail: recipientUserRow.email,
+        recipientName: recipientUserRow.name,
+        recipientEmailNotifPrefsJson: recipientUserRow.emailNotifPrefsJson,
+        senderName: senderRows[0].name,
+        senderSubtitle,
+        senderAccessLevel,
+        subject: existingConv?.subject || normalizedSubject,
+        body: trimmedBody,
+        conversationId,
+      });
+      if (fwdResult.forwarded && fwdResult.targetEmail) {
+        forwardedToEmail = fwdResult.targetEmail;
+      }
+    } else if (recipientType === 'company' && recipientCompanyRow) {
+      // Forward to company owners/admins according to their per-level email routing rules
+      const admins = await db
+        .select({
+          id: schema.users.id,
+          name: schema.users.name,
+          email: schema.users.email,
+          emailNotifPrefsJson: schema.users.emailNotifPrefsJson,
+          role: schema.companyMembers.role,
+        })
+        .from(schema.companyMembers)
+        .innerJoin(schema.users, eq(schema.companyMembers.userId, schema.users.id))
+        .where(eq(schema.companyMembers.companyId, recipientCompanyRow.id));
+
+      for (const adm of admins) {
+        if (adm.role === 'owner' || adm.role === 'admin') {
+          const fwdResult = await forwardInboundMessageToEmail(env, {
+            recipientPrimaryEmail: adm.email,
+            recipientName: adm.name,
+            recipientEmailNotifPrefsJson: adm.emailNotifPrefsJson,
+            senderName: senderRows[0].name,
+            senderSubtitle,
+            senderAccessLevel,
+            subject: existingConv?.subject || normalizedSubject,
+            body: trimmedBody,
+            conversationId,
+            inboxContextLabel: `${recipientCompanyRow.name} Company Inbox`,
+          });
+          if (fwdResult.forwarded && fwdResult.targetEmail && !forwardedToEmail) {
+            forwardedToEmail = fwdResult.targetEmail;
+          }
+        }
+      }
+    }
+
+    return { conversationId, messageId, senderAccessLevel, forwardedToEmail };
   }
 
   /**
@@ -288,9 +403,10 @@ export class MessageService {
       conversationId: string;
       body: string;
       sendAsCompanyId?: string | null;
+      env?: Partial<Env>;
     }
-  ): Promise<{ messageId: string }> {
-    const { actorUserId, conversationId, body, sendAsCompanyId } = params;
+  ): Promise<{ messageId: string; forwardedToEmail: string | null }> {
+    const { actorUserId, conversationId, body, sendAsCompanyId, env = {} } = params;
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > 4000) {
       throw new AccessControlError('Message body must be between 1 and 4,000 characters.', 400);
@@ -339,33 +455,39 @@ export class MessageService {
     }
 
     // Check blocking in both directions before allowing any message in the thread
+    let initiatorToRecipientAccess: AccessLevelValue = ACCESS_LEVELS.GENERAL;
+    let recipientToInitiatorAccess: AccessLevelValue = ACCESS_LEVELS.GENERAL;
+
     if (conv.recipientType === 'user' && conv.recipientUserId) {
-      const initToRec = await AccessService.getAccessLevel(
+      initiatorToRecipientAccess = await AccessService.getAccessLevel(
         db,
         conv.initiatorUserId,
         'user',
         conv.recipientUserId
       );
-      const recToInit = await AccessService.getAccessLevel(
+      recipientToInitiatorAccess = await AccessService.getAccessLevel(
         db,
         conv.recipientUserId,
         'user',
         conv.initiatorUserId
       );
-      if (initToRec === ACCESS_LEVELS.BLOCKED || recToInit === ACCESS_LEVELS.BLOCKED) {
+      if (
+        initiatorToRecipientAccess === ACCESS_LEVELS.BLOCKED ||
+        recipientToInitiatorAccess === ACCESS_LEVELS.BLOCKED
+      ) {
         throw new AccessControlError(
           'Messaging in this conversation is disabled because one participant has blocked the other.',
           403
         );
       }
     } else if (conv.recipientType === 'company' && conv.recipientCompanyId) {
-      const initToComp = await AccessService.getAccessLevel(
+      initiatorToRecipientAccess = await AccessService.getAccessLevel(
         db,
         conv.initiatorUserId,
         'company',
         conv.recipientCompanyId
       );
-      if (initToComp === ACCESS_LEVELS.BLOCKED) {
+      if (initiatorToRecipientAccess === ACCESS_LEVELS.BLOCKED) {
         throw new AccessControlError(
           'Messaging in this conversation is disabled because the contact is blocked.',
           403
@@ -402,7 +524,52 @@ export class MessageService {
       })
       .where(eq(schema.conversations.id, conv.id));
 
-    return { messageId };
+    // Forward reply to the counterparty according to their per-level email forwarding settings
+    let forwardedToEmail: string | null = null;
+    const actorRows = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, actorUserId))
+      .limit(1);
+    const actorUser = actorRows[0];
+
+    if (actorUser) {
+      const senderSubtitle =
+        [actorUser.position, actorUser.companyName].filter(Boolean).join(' · ') ||
+        actorUser.headline;
+
+      if (conv.recipientType === 'user' && conv.recipientUserId) {
+        const targetUserId =
+          actingSide === 'initiator' ? conv.recipientUserId : conv.initiatorUserId;
+        const effectiveAccess =
+          actingSide === 'initiator' ? initiatorToRecipientAccess : recipientToInitiatorAccess;
+
+        const targetRows = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, targetUserId))
+          .limit(1);
+
+        if (targetRows[0]) {
+          const fwdResult = await forwardInboundMessageToEmail(env, {
+            recipientPrimaryEmail: targetRows[0].email,
+            recipientName: targetRows[0].name,
+            recipientEmailNotifPrefsJson: targetRows[0].emailNotifPrefsJson,
+            senderName: actorUser.name,
+            senderSubtitle,
+            senderAccessLevel: effectiveAccess,
+            subject: conv.subject,
+            body: trimmedBody,
+            conversationId: conv.id,
+          });
+          if (fwdResult.forwarded && fwdResult.targetEmail) {
+            forwardedToEmail = fwdResult.targetEmail;
+          }
+        }
+      }
+    }
+
+    return { messageId, forwardedToEmail };
   }
 
   /**
