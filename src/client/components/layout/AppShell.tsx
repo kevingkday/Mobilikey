@@ -271,7 +271,7 @@ export function AppShell({
       </div>
 
       {/* Mobile Compact Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex lg:hidden items-center justify-around border-t border-[#E2E8F0] bg-white py-1.5 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex lg:hidden items-center justify-around border-t border-[#E2E8F0] bg-white pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
