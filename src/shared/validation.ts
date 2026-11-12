@@ -19,7 +19,7 @@ export const signUpSchema = z.object({
     .regex(/[A-Za-z]/, 'Password must contain at least one letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
   headline: z.string().trim().max(140).optional().default(''),
-  biography: z.string().trim().max(1000).optional().default(''),
+  biography: z.string().trim().max(4000).optional().default(''),
   companyName: z.string().trim().max(120).optional().default(''),
   position: z.string().trim().max(120).optional().default(''),
   location: z.string().trim().max(120).optional().default(''),
@@ -59,7 +59,7 @@ export const resetPasswordSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(100),
   headline: z.string().trim().max(140).default(''),
-  biography: z.string().trim().max(1000).default(''),
+  biography: z.string().trim().max(4000).default(''),
   location: z.string().trim().max(120).default(''),
   companyName: z.string().trim().max(120).default(''),
   position: z.string().trim().max(120).default(''),

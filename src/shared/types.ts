@@ -53,6 +53,7 @@ export interface PublicUserProfile {
   userAccessToViewer?: AccessLevelValue;
   isFollowing?: boolean;
   followerCount?: number;
+  affiliatedCompanies?: ManagedCompanySummary[];
 }
 
 export interface AuthenticatedUser extends PublicUserProfile {

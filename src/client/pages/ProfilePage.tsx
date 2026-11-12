@@ -10,6 +10,11 @@ import {
   Flag,
   CheckCircle2,
   ExternalLink,
+  Building2,
+  Linkedin,
+  Github,
+  Award,
+  Sparkles,
 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AccessBadge, EntityAvatar } from '../components/ui/AccessBadge';
@@ -244,16 +249,21 @@ export function MyProfilePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#1F2937] mb-1">
-              Short Professional Biography
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-[#1F2937]">
+                Executive / Professional Biography
+              </label>
+              <span className="text-[11px] text-[#64748B]">
+                {biography.length} / 4,000 characters
+              </span>
+            </div>
             <textarea
-              rows={4}
-              maxLength={1000}
+              rows={8}
+              maxLength={4000}
               value={biography}
               onChange={(e) => setBiography(e.target.value)}
-              placeholder="Concise summary of your role, experience, and professional focus..."
-              className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937]"
+              placeholder="Comprehensive summary of your executive focus, experience, notable accomplishments, and technical or industry background..."
+              className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937] focus:border-[#287D7D] focus:ring-1 focus:ring-[#287D7D] transition-colors leading-relaxed"
             />
           </div>
 
@@ -325,6 +335,56 @@ export function PublicProfilePage() {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  // Update dynamic document title and meta description for SEO & OpenGraph
+  useEffect(() => {
+    if (!profile) return;
+    const originalTitle = document.title;
+    const pageTitle = `${profile.name} — ${profile.headline || profile.position || 'Professional Profile'} | Mobilikey`;
+    document.title = pageTitle;
+
+    // OpenGraph & Meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    const cleanBio = profile.biography ? profile.biography.replace(/\s+/g, ' ').slice(0, 160) : '';
+    const descContent = cleanBio || `${profile.name}'s verified professional credentials, industry leadership, and contact access on Mobilikey.`;
+    metaDesc.setAttribute('content', descContent);
+
+    // JSON-LD structured data for Google Rich Results (Person schema)
+    const scriptId = 'mobilikey-person-schema';
+    let scriptTag = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = scriptId;
+      scriptTag.type = 'application/ld+json';
+      document.head.appendChild(scriptTag);
+    }
+    const sameAsList: string[] = [];
+    if (profile.socialLinks?.linkedin) sameAsList.push(profile.socialLinks.linkedin);
+    if (profile.socialLinks?.github) sameAsList.push(profile.socialLinks.github);
+    if (profile.website) sameAsList.push(profile.website);
+
+    scriptTag.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: profile.name,
+      jobTitle: profile.position || profile.headline,
+      worksFor: profile.companyName ? { '@type': 'Organization', name: profile.companyName } : undefined,
+      description: descContent,
+      url: window.location.href,
+      sameAs: sameAsList.length > 0 ? sameAsList : undefined,
+    });
+
+    return () => {
+      document.title = originalTitle;
+      const s = document.getElementById(scriptId);
+      if (s) s.remove();
+    };
+  }, [profile]);
 
   async function handleToggleFollow() {
     if (!profile || !user) return;
@@ -505,14 +565,112 @@ export function PublicProfilePage() {
               </div>
             )}
 
+            {/* Executive / Professional Summary */}
             {profile.biography && (
-              <div className="mt-5 border-t border-[#E2E8F0] pt-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-[#64748B] mb-2">
-                  Professional Summary
-                </h2>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-[#1F2937]">
-                  {profile.biography}
-                </p>
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Executive & Professional Background
+                  </h2>
+                </div>
+                <div className="prose prose-sm max-w-none text-[#1F2937]">
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-[#334155] bg-[#F8FAFC] border border-[#E2E8F0]/70 rounded-md p-4">
+                    {profile.biography}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Organizations & Affiliated Companies */}
+            {profile.affiliatedCompanies && profile.affiliatedCompanies.length > 0 && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Managed & Affiliated Organizations
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {profile.affiliatedCompanies.map((c) => (
+                    <Link
+                      key={c.id}
+                      to={`/companies`}
+                      className="flex items-center justify-between p-3 rounded-md border border-[#E2E8F0] bg-[#FFFFFF] hover:border-[#CBD5E1] hover:bg-[#F8FAFC] transition-colors group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {c.logoUrl ? (
+                          <img
+                            src={c.logoUrl}
+                            alt={c.name}
+                            className="h-9 w-9 rounded border border-[#E2E8F0] object-cover"
+                          />
+                        ) : (
+                          <div className="h-9 w-9 rounded border border-[#CBD5E1] bg-[#F1F5F9] flex items-center justify-center font-bold text-xs text-[#475569]">
+                            {c.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#1F2937] group-hover:text-[#287D7D] truncate">
+                            {c.name}
+                          </p>
+                          <p className="text-[11px] text-[#64748B] capitalize">{c.role} · {c.industry}</p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-[#94A3B8] group-hover:text-[#287D7D] shrink-0 ml-2" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Verified Digital Footprint & Channels */}
+            {(profile.socialLinks?.linkedin || profile.socialLinks?.github || profile.website) && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Award className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Verified Footprint & Directory Links
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {profile.socialLinks?.linkedin && (
+                    <a
+                      href={profile.socialLinks.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#CBD5E1] bg-white text-xs font-medium text-[#0A66C2] hover:bg-[#F0F7FF] transition-colors"
+                    >
+                      <Linkedin className="h-3.5 w-3.5" />
+                      <span>LinkedIn Profile</span>
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </a>
+                  )}
+                  {profile.socialLinks?.github && (
+                    <a
+                      href={profile.socialLinks.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#CBD5E1] bg-white text-xs font-medium text-[#24292F] hover:bg-[#F6F8FA] transition-colors"
+                    >
+                      <Github className="h-3.5 w-3.5" />
+                      <span>GitHub</span>
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </a>
+                  )}
+                  {profile.website && (
+                    <a
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#CBD5E1] bg-white text-xs font-medium text-[#287D7D] hover:bg-[#F2FBFB] transition-colors"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      <span>{profile.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>

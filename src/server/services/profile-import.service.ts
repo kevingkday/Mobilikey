@@ -301,7 +301,7 @@ export function parseProfileDocumentText(rawText: string): ImportedProfileData {
       result.name = basics.name || '';
       result.email = basics.email || '';
       result.headline = basics.label || basics.headline || '';
-      result.biography = (basics.summary || basics.biography || '').slice(0, 1000);
+      result.biography = (basics.summary || basics.biography || '').slice(0, 4000);
       result.website = basics.url || basics.website || '';
       if (basics.location) {
         result.location =
@@ -472,7 +472,7 @@ export function parseProfileDocumentText(rawText: string): ImportedProfileData {
   }
 
   if (summaryLines.length > 0) {
-    result.biography = summaryLines.join(' ').slice(0, 1000).trim();
+    result.biography = summaryLines.join(' ').slice(0, 4000).trim();
   }
 
   // Parse Experience section if position or companyName not yet populated
@@ -514,7 +514,7 @@ export function parseProfileDocumentText(rawText: string): ImportedProfileData {
   if (!result.biography) {
     const longParagraphs = lines.filter((l) => l.length >= 85 && !l.includes('linkedin.com'));
     if (longParagraphs.length > 0) {
-      result.biography = longParagraphs.slice(0, 3).join(' ').slice(0, 1000);
+      result.biography = longParagraphs.slice(0, 5).join(' ').slice(0, 4000);
     }
   }
 
@@ -590,7 +590,7 @@ export function parseLinkedInPublicHtml(
             );
           }
           if (node.description) {
-            profile.biography = decodeHtmlEntities(String(node.description)).slice(0, 1000);
+            profile.biography = decodeHtmlEntities(String(node.description)).slice(0, 4000);
           }
           if (node.image?.contentUrl && !String(node.image.contentUrl).includes('ghost')) {
             profile.avatarUrl = String(node.image.contentUrl);
@@ -656,7 +656,7 @@ export function parseLinkedInPublicHtml(
       .split(/\s*·\s*(?:Experience|Education|Location|500\+|Connections):/i)[0]
       .trim();
     if (cleanBio && !profile.biography && !cleanBio.toLowerCase().startsWith('view ') && cleanBio.length > 20) {
-      profile.biography = cleanBio.slice(0, 1000);
+      profile.biography = cleanBio.slice(0, 4000);
     }
   }
 

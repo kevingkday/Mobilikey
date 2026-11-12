@@ -524,6 +524,21 @@ usersRoutes.get('/:slugOrId', async (c) => {
     .from(schema.follows)
     .where(and(eq(schema.follows.targetType, 'user'), eq(schema.follows.targetUserId, u.id)));
 
+  // Load verified affiliated companies for public profile
+  const affiliatedCompanies = await db
+    .select({
+      companyId: schema.companies.id,
+      id: schema.companies.id,
+      slug: schema.companies.slug,
+      name: schema.companies.name,
+      logoUrl: schema.companies.logoUrl,
+      industry: schema.companies.industry,
+      role: schema.companyMembers.role,
+    })
+    .from(schema.companyMembers)
+    .innerJoin(schema.companies, eq(schema.companyMembers.companyId, schema.companies.id))
+    .where(eq(schema.companyMembers.userId, u.id));
+
   let viewerAccessToUser: AccessLevelValue = ACCESS_LEVELS.GENERAL;
   let userAccessToViewer: AccessLevelValue = ACCESS_LEVELS.GENERAL;
   let isFollowing = false;
@@ -566,6 +581,14 @@ usersRoutes.get('/:slugOrId', async (c) => {
     userAccessToViewer,
     isFollowing,
     followerCount: followersRows.length,
+    affiliatedCompanies: affiliatedCompanies.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      logoUrl: c.logoUrl,
+      industry: c.industry,
+      role: c.role as any,
+    })),
   };
 
   return c.json({ profile });
