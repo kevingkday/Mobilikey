@@ -247,6 +247,16 @@ authRoutes.get('/google/callback', async (c) => {
   }
 });
 
+export function parseJsonArray<T>(raw: string | null | undefined): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function buildAuthenticatedUserPayload(
   db: AppContext['Variables']['db'],
   userId: string,
@@ -306,6 +316,10 @@ export async function buildAuthenticatedUserPayload(
     website: u.website,
     industry: u.industry,
     socialLinks,
+    expertise: parseJsonArray(u.expertiseJson),
+    highlights: parseJsonArray(u.highlightsJson),
+    experience: parseJsonArray(u.experienceJson),
+    credentials: parseJsonArray(u.credentialsJson),
     avatarUrl: u.avatarUrl,
     isPublic: u.isPublic === 1,
     allowLevel1Messages: u.allowLevel1Messages === 1,

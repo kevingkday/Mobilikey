@@ -33,6 +33,25 @@ export interface SocialLinks {
   other?: string;
 }
 
+export interface ExperienceItem {
+  id: string;
+  title: string;
+  company: string;
+  location?: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  description?: string;
+}
+
+export interface CredentialItem {
+  id: string;
+  title: string;
+  issuer: string;
+  year?: string;
+  details?: string;
+}
+
 export interface PublicUserProfile {
   id: string;
   slug: string;
@@ -45,6 +64,10 @@ export interface PublicUserProfile {
   website: string;
   industry: string;
   socialLinks: SocialLinks;
+  expertise: string[];
+  highlights: string[];
+  experience: ExperienceItem[];
+  credentials: CredentialItem[];
   avatarUrl: string | null;
   isPublic: boolean;
   allowLevel1Messages: boolean;

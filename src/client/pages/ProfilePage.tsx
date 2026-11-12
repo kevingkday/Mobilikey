@@ -15,6 +15,14 @@ import {
   Github,
   Award,
   Sparkles,
+  Plus,
+  Trash2,
+  GraduationCap,
+  Tag,
+  X,
+  ChevronUp,
+  ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AccessBadge, EntityAvatar } from '../components/ui/AccessBadge';
@@ -22,7 +30,11 @@ import { ProfileImportCard } from '../components/profile/ProfileImportCard';
 import { useAuth } from '../lib/auth-context';
 import { apiFetch } from '../lib/api';
 import { INDUSTRIES, type AccessLevelValue } from '../../shared/constants';
-import type { PublicUserProfile } from '../../shared/types';
+import type { PublicUserProfile, ExperienceItem, CredentialItem } from '../../shared/types';
+
+function makeLocalId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export function MyProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -38,6 +50,12 @@ export function MyProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [linkedin, setLinkedin] = useState(user?.socialLinks?.linkedin || '');
   const [github, setGithub] = useState(user?.socialLinks?.github || '');
+  const [expertise, setExpertise] = useState<string[]>(user?.expertise || []);
+  const [expertiseInput, setExpertiseInput] = useState('');
+  const [highlights, setHighlights] = useState<string[]>(user?.highlights || []);
+  const [highlightInput, setHighlightInput] = useState('');
+  const [experience, setExperience] = useState<ExperienceItem[]>(user?.experience || []);
+  const [credentials, setCredentials] = useState<CredentialItem[]>(user?.credentials || []);
   const [saving, setSaving] = useState(false);
   const [savedBanner, setSavedBanner] = useState(false);
   const [error, setError] = useState('');
@@ -55,14 +73,103 @@ export function MyProfilePage() {
       setAvatarUrl(user.avatarUrl || '');
       setLinkedin(user.socialLinks?.linkedin || '');
       setGithub(user.socialLinks?.github || '');
+      setExpertise(user.expertise || []);
+      setHighlights(user.highlights || []);
+      setExperience(user.experience || []);
+      setCredentials(user.credentials || []);
     }
   }, [user]);
+
+  function addExpertiseTag() {
+    const val = expertiseInput.trim();
+    if (!val || expertise.length >= 15) return;
+    if (!expertise.some((t) => t.toLowerCase() === val.toLowerCase())) {
+      setExpertise([...expertise, val.slice(0, 60)]);
+    }
+    setExpertiseInput('');
+  }
+
+  function addHighlightItem() {
+    const val = highlightInput.trim();
+    if (!val || highlights.length >= 8) return;
+    setHighlights([...highlights, val.slice(0, 240)]);
+    setHighlightInput('');
+  }
+
+  function addExperienceRow() {
+    if (experience.length >= 20) return;
+    setExperience([
+      ...experience,
+      {
+        id: makeLocalId('exp'),
+        title: '',
+        company: '',
+        location: '',
+        startDate: '',
+        endDate: '',
+        isCurrent: false,
+        description: '',
+      },
+    ]);
+  }
+
+  function updateExperienceRow(id: string, patch: Partial<ExperienceItem>) {
+    setExperience((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  function moveExperienceRow(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= experience.length) return;
+    const copy = [...experience];
+    [copy[index], copy[target]] = [copy[target], copy[index]];
+    setExperience(copy);
+  }
+
+  function addCredentialRow() {
+    if (credentials.length >= 15) return;
+    setCredentials([
+      ...credentials,
+      {
+        id: makeLocalId('cred'),
+        title: '',
+        issuer: '',
+        year: '',
+        details: '',
+      },
+    ]);
+  }
+
+  function updateCredentialRow(id: string, patch: Partial<CredentialItem>) {
+    setCredentials((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setSavedBanner(false);
     setError('');
+
+    const cleanedExperience = experience
+      .filter((item) => item.title.trim() && item.company.trim())
+      .map((item) => ({
+        ...item,
+        title: item.title.trim(),
+        company: item.company.trim(),
+        location: item.location?.trim() || '',
+        startDate: item.startDate.trim(),
+        endDate: item.isCurrent ? 'Present' : item.endDate?.trim() || '',
+        description: item.description?.trim() || '',
+      }));
+
+    const cleanedCredentials = credentials
+      .filter((item) => item.title.trim() && item.issuer.trim())
+      .map((item) => ({
+        ...item,
+        title: item.title.trim(),
+        issuer: item.issuer.trim(),
+        year: item.year?.trim() || '',
+        details: item.details?.trim() || '',
+      }));
 
     try {
       await apiFetch('/api/users/me', {
@@ -81,6 +188,10 @@ export function MyProfilePage() {
             linkedin: linkedin.trim() || undefined,
             github: github.trim() || undefined,
           },
+          expertise,
+          highlights: highlights.map((h) => h.trim()).filter(Boolean),
+          experience: cleanedExperience,
+          credentials: cleanedCredentials,
         }),
       });
       await refreshUser();
@@ -267,6 +378,387 @@ export function MyProfilePage() {
             />
           </div>
 
+          {/* Core Competencies & Areas of Expertise */}
+          <div className="border-t border-[#E2E8F0] pt-5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]">
+                <Tag className="h-3.5 w-3.5 text-[#287D7D]" />
+                <span>Core Competencies & Areas of Expertise</span>
+              </label>
+              <span className="text-[11px] text-[#64748B]">{expertise.length} / 15 tags</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                maxLength={60}
+                value={expertiseInput}
+                onChange={(e) => setExpertiseInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addExpertiseTag();
+                  }
+                }}
+                placeholder="e.g. Commercial Insurance, Corporate Finance, AI Automation..."
+                className="flex-1 rounded border border-[#E2E8F0] px-3 py-1.5 text-xs text-[#1F2937]"
+              />
+              <button
+                type="button"
+                onClick={addExpertiseTag}
+                disabled={expertise.length >= 15 || !expertiseInput.trim()}
+                className="inline-flex items-center gap-1 rounded border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1.5 text-xs font-medium text-[#243B53] hover:bg-[#F1F5F9] disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add</span>
+              </button>
+            </div>
+            {expertise.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {expertise.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-1 text-xs font-medium text-[#243B53]"
+                  >
+                    <span>{tag}</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpertise(expertise.filter((t) => t !== tag))}
+                      className="text-[#64748B] hover:text-red-600"
+                      title="Remove"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Key Career Highlights & Milestones */}
+          <div className="border-t border-[#E2E8F0] pt-5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]">
+                <Award className="h-3.5 w-3.5 text-[#287D7D]" />
+                <span>Key Career Highlights & Milestones</span>
+              </label>
+              <span className="text-[11px] text-[#64748B]">{highlights.length} / 8 items</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                maxLength={240}
+                value={highlightInput}
+                onChange={(e) => setHighlightInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addHighlightItem();
+                  }
+                }}
+                placeholder="e.g. Raised $25M+ across public and private corporate structures..."
+                className="flex-1 rounded border border-[#E2E8F0] px-3 py-1.5 text-xs text-[#1F2937]"
+              />
+              <button
+                type="button"
+                onClick={addHighlightItem}
+                disabled={highlights.length >= 8 || !highlightInput.trim()}
+                className="inline-flex items-center gap-1 rounded border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1.5 text-xs font-medium text-[#243B53] hover:bg-[#F1F5F9] disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add</span>
+              </button>
+            </div>
+            {highlights.length > 0 && (
+              <ul className="space-y-1.5 pt-1">
+                {highlights.map((item, idx) => (
+                  <li
+                    key={`${idx}-${item.slice(0, 12)}`}
+                    className="flex items-center justify-between gap-2 rounded border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2 text-xs text-[#1F2937]"
+                  >
+                    <span className="flex-1">{item}</span>
+                    <button
+                      type="button"
+                      onClick={() => setHighlights(highlights.filter((_, i) => i !== idx))}
+                      className="text-[#64748B] hover:text-red-600 shrink-0"
+                      title="Remove highlight"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Employment History & Roles */}
+          <div className="border-t border-[#E2E8F0] pt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]">
+                <Briefcase className="h-3.5 w-3.5 text-[#287D7D]" />
+                <span>Employment History & Executive Roles</span>
+              </label>
+              <button
+                type="button"
+                onClick={addExperienceRow}
+                disabled={experience.length >= 20}
+                className="inline-flex items-center gap-1 rounded border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-1 text-xs font-medium text-[#243B53] hover:bg-[#F1F5F9] disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Role</span>
+              </button>
+            </div>
+
+            {experience.length === 0 ? (
+              <p className="text-xs text-[#64748B] italic">
+                No employment history added yet. Click &ldquo;Add Role&rdquo; to list current and past positions.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {experience.map((exp, index) => (
+                  <div
+                    key={exp.id}
+                    className="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
+                        Role #{index + 1}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveExperienceRow(index, -1)}
+                          disabled={index === 0}
+                          className="rounded p-1 text-[#64748B] hover:bg-white disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveExperienceRow(index, 1)}
+                          disabled={index === experience.length - 1}
+                          className="rounded p-1 text-[#64748B] hover:bg-white disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExperience((prev) => prev.filter((item) => item.id !== exp.id))
+                          }
+                          className="rounded p-1 text-[#64748B] hover:bg-white hover:text-red-600"
+                          title="Remove role"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Title / Position *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={120}
+                          value={exp.title}
+                          onChange={(e) => updateExperienceRow(exp.id, { title: e.target.value })}
+                          placeholder="e.g. Principal & Managing Broker"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Organization / Company *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={120}
+                          value={exp.company}
+                          onChange={(e) => updateExperienceRow(exp.id, { company: e.target.value })}
+                          placeholder="e.g. Ocean Falls Insurance Services"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={120}
+                          value={exp.location || ''}
+                          onChange={(e) => updateExperienceRow(exp.id, { location: e.target.value })}
+                          placeholder="e.g. Vancouver, BC"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Start Date
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={40}
+                          value={exp.startDate}
+                          onChange={(e) => updateExperienceRow(exp.id, { startDate: e.target.value })}
+                          placeholder="e.g. Jan 2018"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          End Date
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={40}
+                          disabled={Boolean(exp.isCurrent)}
+                          value={exp.isCurrent ? 'Present' : exp.endDate || ''}
+                          onChange={(e) => updateExperienceRow(exp.id, { endDate: e.target.value })}
+                          placeholder="e.g. Dec 2023"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937] disabled:bg-[#F1F5F9]"
+                        />
+                        <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-[#475569] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(exp.isCurrent)}
+                            onChange={(e) =>
+                              updateExperienceRow(exp.id, {
+                                isCurrent: e.target.checked,
+                                endDate: e.target.checked ? 'Present' : '',
+                              })
+                            }
+                          />
+                          <span>Current role</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                        Role Summary & Responsibilities
+                      </label>
+                      <textarea
+                        rows={2}
+                        maxLength={1500}
+                        value={exp.description || ''}
+                        onChange={(e) =>
+                          updateExperienceRow(exp.id, { description: e.target.value })
+                        }
+                        placeholder="Key responsibilities, outcomes, and scope of leadership..."
+                        className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Education, Licenses & Board Seats */}
+          <div className="border-t border-[#E2E8F0] pt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[#1F2937]">
+                <GraduationCap className="h-3.5 w-3.5 text-[#287D7D]" />
+                <span>Education, Licenses & Board Seats</span>
+              </label>
+              <button
+                type="button"
+                onClick={addCredentialRow}
+                disabled={credentials.length >= 15}
+                className="inline-flex items-center gap-1 rounded border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-1 text-xs font-medium text-[#243B53] hover:bg-[#F1F5F9] disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Credential</span>
+              </button>
+            </div>
+
+            {credentials.length === 0 ? (
+              <p className="text-xs text-[#64748B] italic">
+                No education, licenses, or board positions added yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {credentials.map((cred) => (
+                  <div
+                    key={cred.id}
+                    className="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 space-y-2.5"
+                  >
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                      <div className="sm:col-span-5">
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Degree, License or Designation *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={140}
+                          value={cred.title}
+                          onChange={(e) => updateCredentialRow(cred.id, { title: e.target.value })}
+                          placeholder="e.g. Level 3 General Insurance License"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Institution / Licensing Body *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={120}
+                          value={cred.issuer}
+                          onChange={(e) => updateCredentialRow(cred.id, { issuer: e.target.value })}
+                          placeholder="e.g. Insurance Council of BC"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-medium text-[#475569] mb-1">
+                          Year
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={40}
+                          value={cred.year || ''}
+                          onChange={(e) => updateCredentialRow(cred.id, { year: e.target.value })}
+                          placeholder="e.g. 2012"
+                          className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                        />
+                      </div>
+                      <div className="sm:col-span-1 flex items-end justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCredentials((prev) => prev.filter((item) => item.id !== cred.id))
+                          }
+                          className="rounded p-1.5 text-[#64748B] hover:bg-white hover:text-red-600"
+                          title="Remove credential"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        maxLength={500}
+                        value={cred.details || ''}
+                        onChange={(e) => updateCredentialRow(cred.id, { details: e.target.value })}
+                        placeholder="Optional notes (honors, jurisdiction, specialization)..."
+                        className="w-full rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs text-[#1F2937]"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-[#E2E8F0] pt-4">
             <div>
               <label className="block text-xs font-medium text-[#1F2937] mb-1">
@@ -377,6 +869,15 @@ export function PublicProfilePage() {
       description: descContent,
       url: window.location.href,
       sameAs: sameAsList.length > 0 ? sameAsList : undefined,
+      knowsAbout: profile.expertise && profile.expertise.length > 0 ? profile.expertise : undefined,
+      hasCredential:
+        profile.credentials && profile.credentials.length > 0
+          ? profile.credentials.map((c) => ({
+              '@type': 'EducationalOccupationalCredential',
+              name: c.title,
+              recognizedBy: { '@type': 'Organization', name: c.issuer },
+            }))
+          : undefined,
     });
 
     return () => {
@@ -578,6 +1079,131 @@ export function PublicProfilePage() {
                   <p className="whitespace-pre-line text-sm leading-relaxed text-[#334155] bg-[#F8FAFC] border border-[#E2E8F0]/70 rounded-md p-4">
                     {profile.biography}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Core Competencies & Areas of Expertise */}
+            {profile.expertise && profile.expertise.length > 0 && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Core Competencies & Expertise
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {profile.expertise.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1 text-xs font-medium text-[#243B53]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Key Career Highlights & Milestones */}
+            {profile.highlights && profile.highlights.length > 0 && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Award className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Key Career Highlights & Milestones
+                  </h2>
+                </div>
+                <ul className="space-y-2">
+                  {profile.highlights.map((item, idx) => (
+                    <li
+                      key={`${idx}-${item.slice(0, 12)}`}
+                      className="flex items-start gap-2.5 text-sm text-[#334155]"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-[#287D7D] shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Employment History & Executive Roles */}
+            {profile.experience && profile.experience.length > 0 && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Briefcase className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Employment History & Roles
+                  </h2>
+                </div>
+                <div className="space-y-4 border-l-2 border-[#E2E8F0] pl-4 ml-1.5">
+                  {profile.experience.map((exp) => (
+                    <div key={exp.id} className="relative">
+                      <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#287D7D] bg-white" />
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-[#1F2937]">{exp.title}</h3>
+                          <p className="text-xs font-medium text-[#243B53]">
+                            {exp.company}
+                            {exp.location ? (
+                              <span className="text-[#64748B] font-normal"> · {exp.location}</span>
+                            ) : null}
+                          </p>
+                        </div>
+                        {(exp.startDate || exp.endDate || exp.isCurrent) && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded px-2 py-0.5">
+                            <Calendar className="h-3 w-3" />
+                            <span>
+                              {[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate]
+                                .filter(Boolean)
+                                .join(' — ')}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      {exp.description && (
+                        <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-[#475569]">
+                          {exp.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Education, Licenses & Board Seats */}
+            {profile.credentials && profile.credentials.length > 0 && (
+              <div className="mt-6 border-t border-[#E2E8F0] pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <GraduationCap className="h-4 w-4 text-[#287D7D]" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                    Education, Licenses & Credentials
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {profile.credentials.map((cred) => (
+                    <div
+                      key={cred.id}
+                      className="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-semibold text-[#1F2937]">{cred.title}</p>
+                        {cred.year && (
+                          <span className="text-[11px] font-medium text-[#64748B] shrink-0">
+                            {cred.year}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-[#243B53]">{cred.issuer}</p>
+                      {cred.details && (
+                        <p className="mt-1 text-[11px] text-[#64748B] leading-relaxed">
+                          {cred.details}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

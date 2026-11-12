@@ -56,6 +56,25 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number'),
 });
 
+export const experienceItemSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  title: z.string().trim().min(1, 'Role title is required').max(120),
+  company: z.string().trim().min(1, 'Organization is required').max(120),
+  location: z.string().trim().max(120).optional().default(''),
+  startDate: z.string().trim().max(40).default(''),
+  endDate: z.string().trim().max(40).optional().default(''),
+  isCurrent: z.boolean().optional().default(false),
+  description: z.string().trim().max(1500).optional().default(''),
+});
+
+export const credentialItemSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  title: z.string().trim().min(1, 'Credential or degree title is required').max(140),
+  issuer: z.string().trim().min(1, 'Institution or issuer is required').max(120),
+  year: z.string().trim().max(40).optional().default(''),
+  details: z.string().trim().max(500).optional().default(''),
+});
+
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(100),
   headline: z.string().trim().max(140).default(''),
@@ -75,6 +94,10 @@ export const updateProfileSchema = z.object({
     })
     .optional()
     .default({}),
+  expertise: z.array(z.string().trim().min(1).max(60)).max(15).optional(),
+  highlights: z.array(z.string().trim().min(1).max(240)).max(8).optional(),
+  experience: z.array(experienceItemSchema).max(20).optional(),
+  credentials: z.array(credentialItemSchema).max(15).optional(),
   isPublic: z.boolean().optional(),
   allowLevel1Messages: z.boolean().optional(),
 });

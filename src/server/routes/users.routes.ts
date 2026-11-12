@@ -12,7 +12,7 @@ import { requireAuth, SESSION_COOKIE_NAME } from '../middleware/auth';
 import { AccessService } from '../services/access.service';
 import { generateId } from '../services/auth.service';
 import { forwardInboundMessageToEmail } from '../services/email.service';
-import { buildAuthenticatedUserPayload } from './auth.routes';
+import { buildAuthenticatedUserPayload, parseJsonArray } from './auth.routes';
 import type { PublicUserProfile } from '../../shared/types';
 import { ACCESS_LEVELS, type AccessLevelValue } from '../../shared/constants';
 import { checkRateLimit } from '../middleware/rateLimit';
@@ -336,6 +336,10 @@ usersRoutes.put('/me', requireAuth, async (c) => {
       industry: d.industry,
       ...(d.avatarUrl !== undefined ? { avatarUrl: d.avatarUrl || null } : {}),
       socialLinksJson: JSON.stringify(d.socialLinks || {}),
+      ...(d.expertise !== undefined ? { expertiseJson: JSON.stringify(d.expertise) } : {}),
+      ...(d.highlights !== undefined ? { highlightsJson: JSON.stringify(d.highlights) } : {}),
+      ...(d.experience !== undefined ? { experienceJson: JSON.stringify(d.experience) } : {}),
+      ...(d.credentials !== undefined ? { credentialsJson: JSON.stringify(d.credentials) } : {}),
       ...(d.isPublic !== undefined ? { isPublic: d.isPublic ? 1 : 0 } : {}),
       ...(d.allowLevel1Messages !== undefined
         ? { allowLevel1Messages: d.allowLevel1Messages ? 1 : 0 }
@@ -573,6 +577,10 @@ usersRoutes.get('/:slugOrId', async (c) => {
     website: u.website,
     industry: u.industry,
     socialLinks,
+    expertise: parseJsonArray(u.expertiseJson),
+    highlights: parseJsonArray(u.highlightsJson),
+    experience: parseJsonArray(u.experienceJson),
+    credentials: parseJsonArray(u.credentialsJson),
     avatarUrl: u.avatarUrl,
     isPublic: u.isPublic === 1,
     allowLevel1Messages: u.allowLevel1Messages === 1,
