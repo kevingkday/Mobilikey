@@ -9,6 +9,28 @@ const optionalUrlSchema = z
     'Must be a valid http:// or https:// URL'
   );
 
+const optionalImageUrlSchema = z
+  .string()
+  .trim()
+  .max(200000, 'Image file is too large (please choose a smaller image)')
+  .refine(
+    (val) =>
+      val === '' ||
+      (/^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val) && val.length <= 300) ||
+      /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(val),
+    'Must be a valid http(s):// URL or an uploaded image file'
+  );
+
+const socialLinksSchema = z
+  .object({
+    linkedin: optionalUrlSchema.optional(),
+    github: optionalUrlSchema.optional(),
+    x: optionalUrlSchema.optional(),
+    other: optionalUrlSchema.optional(),
+  })
+  .optional()
+  .default({});
+
 export const signUpSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().trim().email('Valid work or professional email is required').max(255),
@@ -144,13 +166,16 @@ export const createCompanySchema = z.object({
     .min(2)
     .max(80)
     .optional(),
-  logoUrl: optionalUrlSchema.nullable().optional(),
+  logoUrl: optionalImageUrlSchema.nullable().optional(),
   description: z.string().trim().min(10, 'Please provide a brief factual company description').max(1000),
   website: optionalUrlSchema.default(''),
   industry: z.string().trim().min(2, 'Industry is required').max(100),
   headquarters: z.string().trim().min(2, 'Headquarters location is required').max(120),
   companySize: z.string().trim().min(1).max(60),
   contactInfo: z.string().trim().max(200).default(''),
+  contactEmail: optionalEmailSchema.optional().default(''),
+  contactPhone: z.string().trim().max(40).optional().default(''),
+  socialLinks: socialLinksSchema,
 });
 
 export const updateCompanySchema = createCompanySchema.partial().extend({

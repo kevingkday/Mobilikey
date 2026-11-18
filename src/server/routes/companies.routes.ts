@@ -11,7 +11,17 @@ import { requireAuth } from '../middleware/auth';
 import { AccessService } from '../services/access.service';
 import { generateId, slugify } from '../services/auth.service';
 import { ACCESS_LEVELS, type AccessLevelValue } from '../../shared/constants';
-import type { CompanyMemberRole, CompanyProfile } from '../../shared/types';
+import type { CompanyMemberRole, CompanyProfile, SocialLinks } from '../../shared/types';
+
+function parseSocialLinks(json: string | null | undefined): SocialLinks {
+  if (!json) return {};
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as SocialLinks) : {};
+  } catch {
+    return {};
+  }
+}
 
 export const companiesRoutes = new Hono<AppContext>();
 
@@ -88,6 +98,9 @@ companiesRoutes.get('/', async (c) => {
         headquarters: comp.headquarters,
         companySize: comp.companySize,
         contactInfo: comp.contactInfo,
+        contactEmail: comp.contactEmail,
+        contactPhone: comp.contactPhone,
+        socialLinks: parseSocialLinks(comp.socialLinksJson),
         status: comp.status as 'active' | 'suspended',
         createdAt: comp.createdAt,
         followerCount: flwRows.length,
@@ -136,6 +149,9 @@ companiesRoutes.post('/', requireAuth, async (c) => {
     headquarters: d.headquarters,
     companySize: d.companySize,
     contactInfo: d.contactInfo,
+    contactEmail: d.contactEmail || '',
+    contactPhone: d.contactPhone || '',
+    socialLinksJson: JSON.stringify(d.socialLinks || {}),
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -325,6 +341,9 @@ companiesRoutes.get('/:slugOrId', async (c) => {
     headquarters: comp.headquarters,
     companySize: comp.companySize,
     contactInfo: comp.contactInfo,
+    contactEmail: comp.contactEmail,
+    contactPhone: comp.contactPhone,
+    socialLinks: parseSocialLinks(comp.socialLinksJson),
     status: comp.status as 'active' | 'suspended',
     createdAt: comp.createdAt,
     followerCount: flwRows.length,
@@ -381,6 +400,11 @@ companiesRoutes.put('/:id', requireAuth, async (c) => {
       ...(d.headquarters !== undefined ? { headquarters: d.headquarters } : {}),
       ...(d.companySize !== undefined ? { companySize: d.companySize } : {}),
       ...(d.contactInfo !== undefined ? { contactInfo: d.contactInfo } : {}),
+      ...(d.contactEmail !== undefined ? { contactEmail: d.contactEmail } : {}),
+      ...(d.contactPhone !== undefined ? { contactPhone: d.contactPhone } : {}),
+      ...(d.socialLinks !== undefined
+        ? { socialLinksJson: JSON.stringify(d.socialLinks) }
+        : {}),
       updatedAt: now,
     })
     .where(eq(schema.companies.id, companyId));

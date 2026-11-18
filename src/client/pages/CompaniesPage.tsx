@@ -4,6 +4,7 @@ import {
   Building2,
   Plus,
   Mail,
+  Phone,
   Globe,
   MapPin,
   Users,
@@ -11,13 +12,19 @@ import {
   UserCheck,
   Trash2,
   Flag,
+  Pencil,
+  ExternalLink,
 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AccessBadge, EntityAvatar } from '../components/ui/AccessBadge';
 import { AnnouncementCard } from '../components/announcements/AnnouncementCard';
+import {
+  CompanyProfileForm,
+  type CompanyFormValues,
+} from '../components/companies/CompanyProfileForm';
 import { useAuth } from '../lib/auth-context';
 import { apiFetch } from '../lib/api';
-import { INDUSTRIES, COMPANY_SIZES, type AccessLevelValue } from '../../shared/constants';
+import type { AccessLevelValue } from '../../shared/constants';
 import type { AnnouncementItem, CompanyProfile } from '../../shared/types';
 
 export function CompaniesManagementPage() {
@@ -27,18 +34,6 @@ export function CompaniesManagementPage() {
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-
-  // Create form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [website, setWebsite] = useState('');
-  const [industry, setIndustry] = useState<string>(INDUSTRIES[0]);
-  const [headquarters, setHeadquarters] = useState('');
-  const [companySize, setCompanySize] = useState<string>(COMPANY_SIZES[0]);
-  const [contactInfo, setContactInfo] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
 
   const loadCompanies = useCallback(async () => {
     setLoading(true);
@@ -54,32 +49,26 @@ export function CompaniesManagementPage() {
     loadCompanies();
   }, [loadCompanies]);
 
-  async function handleCreateCompany(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setCreating(true);
-    try {
-      const res = await apiFetch<{ companyId: string; slug: string }>('/api/companies', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          description,
-          website,
-          industry,
-          headquarters,
-          companySize,
-          contactInfo,
-          logoUrl: logoUrl.trim() || null,
-        }),
-      });
-      await refreshUser();
-      setShowCreateForm(false);
-      navigate(`/c/${res.slug}`);
-    } catch (err: any) {
-      setError(err.message || 'Could not create company profile');
-    } finally {
-      setCreating(false);
-    }
+  async function handleCreateCompany(values: CompanyFormValues) {
+    const res = await apiFetch<{ companyId: string; slug: string }>('/api/companies', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: values.name,
+        description: values.description,
+        website: values.website,
+        industry: values.industry,
+        headquarters: values.headquarters,
+        companySize: values.companySize,
+        contactInfo: values.contactInfo,
+        contactEmail: values.contactEmail,
+        contactPhone: values.contactPhone,
+        socialLinks: values.socialLinks,
+        logoUrl: values.logoUrl.trim() || null,
+      }),
+    });
+    await refreshUser();
+    setShowCreateForm(false);
+    navigate(`/c/${res.slug}`);
   }
 
   return (
@@ -109,160 +98,14 @@ export function CompaniesManagementPage() {
 
         {/* Create Company Form */}
         {showCreateForm && (
-          <form
+          <CompanyProfileForm
+            title="New Company Profile"
+            subtitle="You will be assigned as the primary Owner and Inbox Administrator. Additional administrators can be added at any time."
+            submitLabel="Create Company"
+            submittingLabel="Creating..."
             onSubmit={handleCreateCompany}
-            className="rounded-md border border-[#243B53]/30 bg-white p-5 sm:p-6 space-y-4"
-          >
-            <div className="border-b border-[#E2E8F0] pb-3">
-              <h2 className="text-sm font-bold text-[#1F2937]">New Company Profile</h2>
-              <p className="text-xs text-[#64748B]">
-                You will be assigned as the primary Owner and Inbox Administrator. Additional
-                administrators can be added at any time.
-              </p>
-            </div>
-
-            {error && (
-              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                {error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Company Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Northstar Infrastructure Partners"
-                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">Industry *</label>
-                <select
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  className="w-full rounded border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#1F2937]"
-                >
-                  {INDUSTRIES.map((ind) => (
-                    <option key={ind} value={ind}>
-                      {ind}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Headquarters Location *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={headquarters}
-                  onChange={(e) => setHeadquarters(e.target.value)}
-                  placeholder="New York, NY"
-                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Company Size *
-                </label>
-                <select
-                  value={companySize}
-                  onChange={(e) => setCompanySize(e.target.value)}
-                  className="w-full rounded border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#1F2937]"
-                >
-                  {COMPANY_SIZES.map((sz) => (
-                    <option key={sz} value={sz}>
-                      {sz}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">Website</label>
-                <input
-                  type="url"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://company.com"
-                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                Factual Company Description *
-              </label>
-              <textarea
-                required
-                rows={3}
-                minLength={10}
-                maxLength={1000}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe what the company builds, operates, or provides..."
-                className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-sm text-[#1F2937]"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Public Contact Information (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={contactInfo}
-                  onChange={(e) => setContactInfo(e.target.value)}
-                  placeholder="Institutional Inquiries · New York Office"
-                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-xs text-[#1F2937]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Company Logo URL (Optional)
-                </label>
-                <input
-                  type="url"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://company.com/logo.png"
-                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 text-xs text-[#1F2937]"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
-              <button
-                type="button"
-                onClick={() => setShowCreateForm(false)}
-                className="rounded border border-[#E2E8F0] px-3.5 py-1.5 text-xs font-medium text-[#526579]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={creating}
-                className="rounded bg-[#243B53] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40]"
-              >
-                {creating ? 'Creating...' : 'Create Company'}
-              </button>
-            </div>
-          </form>
+            onCancel={() => setShowCreateForm(false)}
+          />
         )}
 
         {/* User's Managed Companies */}
@@ -398,12 +241,13 @@ export function CompaniesManagementPage() {
 
 export function PublicCompanyPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, openComposeModal, openReportModal } = useAuth();
+  const { user, refreshUser, openComposeModal, openReportModal } = useAuth();
 
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingCompany, setEditingCompany] = useState(false);
 
   // Admin member management
   const [memberEmail, setMemberEmail] = useState('');
@@ -489,6 +333,28 @@ export function PublicCompanyPage() {
     }
   }
 
+  async function handleUpdateCompany(values: CompanyFormValues) {
+    if (!company) return;
+    await apiFetch(`/api/companies/${company.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: values.name,
+        description: values.description,
+        website: values.website,
+        industry: values.industry,
+        headquarters: values.headquarters,
+        companySize: values.companySize,
+        contactInfo: values.contactInfo,
+        contactEmail: values.contactEmail,
+        contactPhone: values.contactPhone,
+        socialLinks: values.socialLinks,
+        logoUrl: values.logoUrl.trim() || null,
+      }),
+    });
+    await Promise.all([loadCompany(), refreshUser()]);
+    setEditingCompany(false);
+  }
+
   const isCompanyAdmin =
     company?.viewerRole === 'owner' || company?.viewerRole === 'admin';
 
@@ -552,13 +418,23 @@ export function PublicCompanyPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {isCompanyAdmin && (
-                  <Link
-                    to={`/messages?inboxType=company&inboxId=${company.id}`}
-                    className="inline-flex items-center gap-1.5 rounded bg-[#287D7D] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1F6363]"
-                  >
-                    <Mail className="h-3.5 w-3.5" />
-                    <span>Open Company Inbox</span>
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCompany((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-medium text-[#1F2937] hover:bg-[#F7F9FB]"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span>{editingCompany ? 'Close Editor' : 'Edit Profile'}</span>
+                    </button>
+                    <Link
+                      to={`/messages?inboxType=company&inboxId=${company.id}`}
+                      className="inline-flex items-center gap-1.5 rounded bg-[#287D7D] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1F6363]"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      <span>Open Company Inbox</span>
+                    </Link>
+                  </>
                 )}
 
                 {user && (
@@ -633,13 +509,99 @@ export function PublicCompanyPage() {
               <p className="whitespace-pre-line text-sm leading-relaxed text-[#1F2937]">
                 {company.description}
               </p>
-              {company.contactInfo && (
-                <p className="mt-3 text-xs text-[#64748B]">
-                  <strong>Contact Context:</strong> {company.contactInfo}
-                </p>
+
+              {(company.contactEmail ||
+                company.contactPhone ||
+                company.contactInfo ||
+                company.socialLinks?.linkedin ||
+                company.socialLinks?.x ||
+                company.socialLinks?.github ||
+                company.socialLinks?.other) && (
+                <div className="mt-4 border-t border-[#E2E8F0] pt-3 space-y-2.5">
+                  {(company.contactEmail || company.contactPhone || company.contactInfo) && (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#526579]">
+                      {company.contactEmail && (
+                        <a
+                          href={`mailto:${company.contactEmail}`}
+                          className="inline-flex items-center gap-1.5 font-medium text-[#243B53] hover:underline"
+                        >
+                          <Mail className="h-3.5 w-3.5 text-[#287D7D]" />
+                          <span>{company.contactEmail}</span>
+                        </a>
+                      )}
+                      {company.contactPhone && (
+                        <a
+                          href={`tel:${company.contactPhone}`}
+                          className="inline-flex items-center gap-1.5 font-medium text-[#243B53] hover:underline"
+                        >
+                          <Phone className="h-3.5 w-3.5 text-[#287D7D]" />
+                          <span>{company.contactPhone}</span>
+                        </a>
+                      )}
+                      {company.contactInfo && (
+                        <span className="text-[#64748B]">
+                          <strong>Contact Note:</strong> {company.contactInfo}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {(company.socialLinks?.linkedin ||
+                    company.socialLinks?.x ||
+                    company.socialLinks?.github ||
+                    company.socialLinks?.other) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { label: 'LinkedIn', href: company.socialLinks?.linkedin },
+                        { label: 'X / Twitter', href: company.socialLinks?.x },
+                        { label: 'GitHub', href: company.socialLinks?.github },
+                        { label: 'Social / Link', href: company.socialLinks?.other },
+                      ]
+                        .filter((item): item is { label: string; href: string } =>
+                          Boolean(item.href)
+                        )
+                        .map((item) => (
+                          <a
+                            key={item.label}
+                            href={item.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded border border-[#E2E8F0] bg-[#F7F9FB] px-2.5 py-1 text-xs font-medium text-[#243B53] hover:border-[#243B53]/40"
+                          >
+                            <span>{item.label}</span>
+                            <ExternalLink className="h-3 w-3 text-[#64748B]" />
+                          </a>
+                        ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
+
+          {editingCompany && isCompanyAdmin && (
+            <CompanyProfileForm
+              title={`Edit ${company.name}`}
+              subtitle="Update company details, logo, public contact information, and social networks."
+              submitLabel="Save Changes"
+              submittingLabel="Saving..."
+              initialValues={{
+                name: company.name,
+                description: company.description,
+                website: company.website,
+                industry: company.industry,
+                headquarters: company.headquarters,
+                companySize: company.companySize,
+                contactInfo: company.contactInfo,
+                contactEmail: company.contactEmail,
+                contactPhone: company.contactPhone,
+                logoUrl: company.logoUrl || '',
+                socialLinks: company.socialLinks || {},
+              }}
+              onSubmit={handleUpdateCompany}
+              onCancel={() => setEditingCompany(false)}
+            />
+          )}
 
           {/* Authorized Administrators & Team Section */}
           <div className="rounded-md border border-[#E2E8F0] bg-white p-5 space-y-4">

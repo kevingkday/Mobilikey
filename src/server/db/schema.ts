@@ -93,6 +93,9 @@ export const companies = sqliteTable(
     headquarters: text('headquarters').notNull().default(''),
     companySize: text('company_size').notNull().default('1 (Solo Principal)'),
     contactInfo: text('contact_info').notNull().default(''),
+    contactEmail: text('contact_email').notNull().default(''),
+    contactPhone: text('contact_phone').notNull().default(''),
+    socialLinksJson: text('social_links_json').notNull().default('{}'),
     status: text('status').notNull().default('active'), // 'active' | 'suspended'
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

@@ -109,6 +109,9 @@ export interface CompanyProfile {
   headquarters: string;
   companySize: string;
   contactInfo: string;
+  contactEmail: string;
+  contactPhone: string;
+  socialLinks: SocialLinks;
   status: 'active' | 'suspended';
   createdAt: number;
   followerCount?: number;
