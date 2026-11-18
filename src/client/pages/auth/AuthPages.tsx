@@ -72,26 +72,6 @@ export function LoginPage() {
     }
   }
 
-  async function quickDemoLogin(demoEmail: string) {
-    setEmail(demoEmail);
-    setPassword('Mobilikey2026!');
-    setError('');
-    setLoading(true);
-    try {
-      const res = await apiFetch<{ user: AuthenticatedUser }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: demoEmail, password: 'Mobilikey2026!' }),
-      });
-      setUserDirect(res.user);
-      await refreshUnread();
-      navigate('/feed');
-    } catch (err: any) {
-      setError(err.message || 'Demo account not seeded yet. Run npm run db:setup:local.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <AppShell>
       <div className="mx-auto max-w-md py-8">
@@ -163,39 +143,6 @@ export function LoginPage() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          {/* Local Development Seeded Account Quick Switcher */}
-          <div className="mt-6 border-t border-[#E2E8F0] pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] mb-2">
-              Quick Sign-In (Seeded Accounts)
-            </p>
-            <div className="grid grid-cols-1 gap-1.5">
-              <button
-                type="button"
-                onClick={() => quickDemoLogin('sarah.chen@northstar-infra.com')}
-                className="flex items-center justify-between rounded border border-[#E2E8F0] bg-[#F7F9FB] px-3 py-1.5 text-left text-xs hover:border-[#CBD5E1]"
-              >
-                <span className="font-medium text-[#1F2937]">Sarah Chen</span>
-                <span className="text-[11px] text-[#64748B]">Managing Partner · Platform Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickDemoLogin('john.miller@vanguard-logistics.com')}
-                className="flex items-center justify-between rounded border border-[#E2E8F0] bg-[#F7F9FB] px-3 py-1.5 text-left text-xs hover:border-[#CBD5E1]"
-              >
-                <span className="font-medium text-[#1F2937]">John Miller</span>
-                <span className="text-[11px] text-[#64748B]">VP Supply Chain · Vanguard</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickDemoLogin('elena.rostova@helion-bio.com')}
-                className="flex items-center justify-between rounded border border-[#E2E8F0] bg-[#F7F9FB] px-3 py-1.5 text-left text-xs hover:border-[#CBD5E1]"
-              >
-                <span className="font-medium text-[#1F2937]">Dr. Elena Rostova</span>
-                <span className="text-[11px] text-[#64748B]">Chief Scientific Officer · Helion</span>
-              </button>
-            </div>
-          </div>
 
           <p className="mt-6 text-center text-xs text-[#64748B]">
             New to Mobilikey?{' '}
