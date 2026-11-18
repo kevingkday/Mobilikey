@@ -38,6 +38,8 @@ export const ANNOUNCEMENT_CATEGORIES = [
   { id: 'cat_expansion', slug: 'expansion', name: 'Expansion', sortOrder: 7 },
   { id: 'cat_milestones', slug: 'milestones', name: 'Milestones', sortOrder: 8 },
   { id: 'cat_other', slug: 'other-business-updates', name: 'Other Business Updates', sortOrder: 9 },
+  { id: 'cat_personal_project', slug: 'personal-project', name: 'Personal Project', sortOrder: 10 },
+  { id: 'cat_seeking_work', slug: 'availability-seeking-work', name: 'Availability / Seeking Work', sortOrder: 11 },
 ] as const;
 
 export const INDUSTRIES = [

@@ -13,40 +13,60 @@ export function AnnouncementCard({
 }: {
   announcement: AnnouncementItem;
   onDelete?: (id: string) => void;
-  onFollowChange?: (companyId: string, following: boolean) => void;
+  onFollowChange?: (targetId: string, following: boolean) => void;
 }) {
   const { user, openComposeModal, openReportModal } = useAuth();
-  const [isFollowingCompany, setIsFollowingCompany] = useState(
-    Boolean(announcement.isFollowingCompany)
-  );
+  const isCompanyPost = Boolean(announcement.companyId && announcement.companySlug);
+  const targetType = isCompanyPost ? 'company' : 'user';
+  const targetId = isCompanyPost ? announcement.companyId! : announcement.authorUserId;
+  const displayName = isCompanyPost
+    ? announcement.companyName || announcement.authorName
+    : announcement.authorName;
+  const displayAvatarUrl = isCompanyPost
+    ? announcement.companyLogoUrl
+    : announcement.authorAvatarUrl;
+  const profileLink = isCompanyPost
+    ? `/c/${announcement.companySlug}`
+    : `/p/${announcement.authorSlug}`;
+  const initialFollowing = isCompanyPost
+    ? Boolean(announcement.isFollowingCompany)
+    : Boolean(announcement.isFollowingAuthor);
+
+  const [isFollowing, setIsFollowing] = useState(initialFollowing);
   const [togglingFollow, setTogglingFollow] = useState(false);
 
   useEffect(() => {
-    setIsFollowingCompany(Boolean(announcement.isFollowingCompany));
-  }, [announcement.isFollowingCompany]);
+    setIsFollowing(
+      isCompanyPost
+        ? Boolean(announcement.isFollowingCompany)
+        : Boolean(announcement.isFollowingAuthor)
+    );
+  }, [isCompanyPost, announcement.isFollowingCompany, announcement.isFollowingAuthor]);
 
   const canDelete =
     user &&
     (user.id === announcement.authorUserId ||
       user.systemRole === 'admin' ||
-      user.managedCompanies.some(
-        (mc) =>
-          mc.id === announcement.companyId && (mc.role === 'owner' || mc.role === 'admin')
-      ));
+      (announcement.companyId
+        ? user.managedCompanies.some(
+            (mc) =>
+              mc.id === announcement.companyId && (mc.role === 'owner' || mc.role === 'admin')
+          )
+        : false));
 
-  async function handleToggleFollowCompany() {
+  async function handleToggleFollow() {
     if (!user || togglingFollow) return;
     setTogglingFollow(true);
     try {
       const res = await apiFetch<{ following: boolean }>('/api/users/follow', {
         method: 'POST',
         body: JSON.stringify({
-          targetType: 'company',
-          targetId: announcement.companyId,
+          targetType,
+          targetId,
         }),
       });
-      setIsFollowingCompany(res.following);
-      onFollowChange?.(announcement.companyId, res.following);
+      setIsFollowing(res.following);
+      onFollowChange?.(targetId, res.following);
     } catch {
       // ignore
     } finally {
@@ -58,56 +78,70 @@ export function AnnouncementCard({
     <article className="rounded-md border border-[#E2E8F0] bg-white p-4 transition-colors hover:border-[#CBD5E1]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <Link to={`/c/${announcement.companySlug}`} className="shrink-0">
+          <Link to={profileLink} className="shrink-0">
             <EntityAvatar
-              name={announcement.companyName}
-              avatarUrl={announcement.companyLogoUrl}
-              isCompany
+              name={displayName}
+              avatarUrl={displayAvatarUrl}
+              isCompany={isCompanyPost}
               size="md"
             />
           </Link>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Link
-                to={`/c/${announcement.companySlug}`}
+                to={profileLink}
                 className="text-sm font-semibold text-[#1F2937] hover:text-[#243B53] hover:underline truncate"
               >
-                {announcement.companyName}
+                {displayName}
               </Link>
               <span className="inline-flex items-center rounded border border-[#243B53]/20 bg-[#F7F9FB] px-2 py-0.5 text-[11px] font-medium text-[#243B53]">
                 {announcement.categoryName}
               </span>
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[#64748B]">
-              {announcement.companyIndustry && <span>{announcement.companyIndustry}</span>}
-              <span>·</span>
-              <time dateTime={new Date(announcement.createdAt).toISOString()}>
-                {formatRelativeTime(announcement.createdAt)}
-              </time>
-              <span>·</span>
-              <span>Published by {announcement.authorName}</span>
+              {isCompanyPost ? (
+                <>
+                  {announcement.companyIndustry && <span>{announcement.companyIndustry}</span>}
+                  {announcement.companyIndustry && <span>·</span>}
+                  <time dateTime={new Date(announcement.createdAt).toISOString()}>
+                    {formatRelativeTime(announcement.createdAt)}
+                  </time>
+                  <span>·</span>
+                  <span>Published by {announcement.authorName}</span>
+                </>
+              ) : (
+                <>
+                  {announcement.authorHeadline && (
+                    <>
+                      <span className="truncate max-w-[260px]">{announcement.authorHeadline}</span>
+                      <span>·</span>
+                    </>
+                  )}
+                  <time dateTime={new Date(announcement.createdAt).toISOString()}>
+                    {formatRelativeTime(announcement.createdAt)}
+                  </time>
+                  <span>·</span>
+                  <span>Individual Update</span>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {user && (
+          {user && (isCompanyPost || user.id !== announcement.authorUserId) && (
             <button
               type="button"
               disabled={togglingFollow}
-              onClick={handleToggleFollowCompany}
-              title={
-                isFollowingCompany
-                  ? `Following ${announcement.companyName}`
-                  : `Follow ${announcement.companyName}`
-              }
+              onClick={handleToggleFollow}
+              title={isFollowing ? `Following ${displayName}` : `Follow ${displayName}`}
               className={`inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
-                isFollowingCompany
+                isFollowing
                   ? 'border-[#287D7D]/30 bg-[#287D7D]/10 text-[#1D5E5E]'
                   : 'border-[#E2E8F0] bg-[#F7F9FB] text-[#526579] hover:text-[#1F2937]'
               }`}
             >
-              {isFollowingCompany ? (
+              {isFollowing ? (
                 <>
                   <UserCheck className="h-3 w-3 text-[#287D7D]" />
                   <span className="hidden sm:inline">Following</span>
@@ -120,18 +154,20 @@ export function AnnouncementCard({
               )}
             </button>
           )}
-          {user && (
+          {user && (isCompanyPost || user.id !== announcement.authorUserId) && (
             <button
               type="button"
               onClick={() =>
                 openComposeModal({
-                  type: 'company',
-                  id: announcement.companyId,
-                  name: announcement.companyName,
-                  subtitle: announcement.companyIndustry,
+                  type: targetType,
+                  id: targetId,
+                  name: displayName,
+                  subtitle: isCompanyPost
+                    ? announcement.companyIndustry || ''
+                    : announcement.authorHeadline || '',
                 })
               }
-              title={`Message ${announcement.companyName}`}
+              title={`Message ${displayName}`}
               className="inline-flex items-center gap-1 rounded border border-[#E2E8F0] bg-white px-2.5 py-1 text-xs font-medium text-[#243B53] hover:bg-[#F7F9FB]"
             >
               <Mail className="h-3 w-3" />
@@ -145,7 +181,7 @@ export function AnnouncementCard({
                 openReportModal({
                   targetType: 'announcement',
                   targetId: announcement.id,
-                  targetLabel: `${announcement.companyName} announcement`,
+                  targetLabel: `${displayName} announcement`,
                 })
               }
               title="Report announcement"

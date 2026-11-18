@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, or } from 'drizzle-orm';
 import type { AppContext } from '../env';
 import * as schema from '../db/schema';
 import { createAnnouncementSchema, createReportSchema } from '../../shared/validation';
@@ -56,6 +56,9 @@ announcementsRoutes.get('/', async (c) => {
       companyStatus: schema.companies.status,
       authorUserId: schema.announcements.authorUserId,
       authorName: schema.users.name,
+      authorSlug: schema.users.slug,
+      authorHeadline: schema.users.headline,
+      authorAvatarUrl: schema.users.avatarUrl,
       categoryId: schema.announcements.categoryId,
       categoryName: schema.announcementCategories.name,
       categorySlug: schema.announcementCategories.slug,
@@ -65,7 +68,7 @@ announcementsRoutes.get('/', async (c) => {
       createdAt: schema.announcements.createdAt,
     })
     .from(schema.announcements)
-    .innerJoin(schema.companies, eq(schema.announcements.companyId, schema.companies.id))
+    .leftJoin(schema.companies, eq(schema.announcements.companyId, schema.companies.id))
     .innerJoin(
       schema.announcementCategories,
       eq(schema.announcements.categoryId, schema.announcementCategories.id)
@@ -74,7 +77,8 @@ announcementsRoutes.get('/', async (c) => {
     .where(
       and(
         eq(schema.announcements.moderationStatus, 'published'),
-        eq(schema.companies.status, 'active')
+        eq(schema.users.status, 'active'),
+        or(isNull(schema.announcements.companyId), eq(schema.companies.status, 'active'))
       )
     )
     .orderBy(desc(schema.announcements.createdAt))
@@ -89,7 +93,7 @@ announcementsRoutes.get('/', async (c) => {
     }
     if (feedMode === 'following' && viewer) {
       return (
-        followedCompanyIds.includes(r.companyId) ||
+        (r.companyId ? followedCompanyIds.includes(r.companyId) : false) ||
         followedUserIds.includes(r.authorUserId)
       );
     }
@@ -105,6 +109,9 @@ announcementsRoutes.get('/', async (c) => {
     companyIndustry: r.companyIndustry,
     authorUserId: r.authorUserId,
     authorName: r.authorName,
+    authorSlug: r.authorSlug,
+    authorHeadline: r.authorHeadline,
+    authorAvatarUrl: r.authorAvatarUrl,
     categoryId: r.categoryId,
     categoryName: r.categoryName,
     categorySlug: r.categorySlug,
@@ -112,7 +119,8 @@ announcementsRoutes.get('/', async (c) => {
     externalUrl: r.externalUrl,
     moderationStatus: r.moderationStatus as AnnouncementItem['moderationStatus'],
     createdAt: r.createdAt,
-    isFollowingCompany: followedCompanyIds.includes(r.companyId),
+    isFollowingCompany: r.companyId ? followedCompanyIds.includes(r.companyId) : false,
+    isFollowingAuthor: followedUserIds.includes(r.authorUserId),
   }));
 
   return c.json({ announcements });
@@ -131,25 +139,28 @@ announcementsRoutes.post('/', requireAuth, async (c) => {
     );
   }
 
-  const { companyId, categoryId, body: textBody, externalUrl } = parsed.data;
+  const { companyId: rawCompanyId, categoryId, body: textBody, externalUrl } = parsed.data;
+  const companyId = rawCompanyId?.trim() || null;
 
-  // Verify user is an authorized member ('owner', 'admin', or 'publisher') of this company
-  const memberRows = await db
-    .select()
-    .from(schema.companyMembers)
-    .where(
-      and(
-        eq(schema.companyMembers.companyId, companyId),
-        eq(schema.companyMembers.userId, user.id)
+  if (companyId) {
+    // Verify user is an authorized member ('owner', 'admin', or 'publisher') of this company
+    const memberRows = await db
+      .select()
+      .from(schema.companyMembers)
+      .where(
+        and(
+          eq(schema.companyMembers.companyId, companyId),
+          eq(schema.companyMembers.userId, user.id)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!memberRows[0]) {
-    return c.json(
-      { error: 'You are not an authorized member of this company and cannot publish on its behalf.' },
-      403
-    );
+    if (!memberRows[0]) {
+      return c.json(
+        { error: 'You are not an authorized member of this company and cannot publish on its behalf.' },
+        403
+      );
+    }
   }
 
   // Verify category is active
@@ -204,19 +215,22 @@ announcementsRoutes.delete('/:id', requireAuth, async (c) => {
     return c.json({ error: 'Announcement not found.' }, 404);
   }
 
-  const memberRows = await db
-    .select()
-    .from(schema.companyMembers)
-    .where(
-      and(
-        eq(schema.companyMembers.companyId, ann.companyId),
-        eq(schema.companyMembers.userId, user.id)
+  let isCompanyAdmin = false;
+  if (ann.companyId) {
+    const memberRows = await db
+      .select()
+      .from(schema.companyMembers)
+      .where(
+        and(
+          eq(schema.companyMembers.companyId, ann.companyId),
+          eq(schema.companyMembers.userId, user.id)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  const isCompanyAdmin =
-    memberRows[0]?.role === 'owner' || memberRows[0]?.role === 'admin';
+    isCompanyAdmin =
+      memberRows[0]?.role === 'owner' || memberRows[0]?.role === 'admin';
+  }
 
   if (ann.authorUserId !== user.id && !isCompanyAdmin && user.systemRole !== 'admin') {
     return c.json({ error: 'Not authorized to remove this announcement.' }, 403);

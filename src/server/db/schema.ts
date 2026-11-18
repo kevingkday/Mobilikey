@@ -218,9 +218,7 @@ export const announcements = sqliteTable(
   'announcements',
   {
     id: text('id').primaryKey(),
-    companyId: text('company_id')
-      .notNull()
-      .references(() => companies.id, { onDelete: 'cascade' }),
+    companyId: text('company_id').references(() => companies.id, { onDelete: 'cascade' }),
     authorUserId: text('author_user_id')
       .notNull()
       .references(() => users.id),

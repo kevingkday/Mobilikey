@@ -215,7 +215,7 @@ export const setAccessLevelSchema = z.object({
 });
 
 export const createAnnouncementSchema = z.object({
-  companyId: z.string().min(1, 'Company is required'),
+  companyId: z.string().trim().optional().nullable(),
   categoryId: z.string().min(1, 'Category is required'),
   body: z
     .string()

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull, or } from 'drizzle-orm';
 import type { AppContext } from '../env';
 import * as schema from '../db/schema';
 import { AccessService } from '../services/access.service';
@@ -154,6 +154,9 @@ searchRoutes.get('/', async (c) => {
         companyHeadquarters: schema.companies.headquarters,
         authorUserId: schema.announcements.authorUserId,
         authorName: schema.users.name,
+        authorSlug: schema.users.slug,
+        authorHeadline: schema.users.headline,
+        authorAvatarUrl: schema.users.avatarUrl,
         categoryId: schema.announcements.categoryId,
         categoryName: schema.announcementCategories.name,
         categorySlug: schema.announcementCategories.slug,
@@ -163,7 +166,7 @@ searchRoutes.get('/', async (c) => {
         createdAt: schema.announcements.createdAt,
       })
       .from(schema.announcements)
-      .innerJoin(schema.companies, eq(schema.announcements.companyId, schema.companies.id))
+      .leftJoin(schema.companies, eq(schema.announcements.companyId, schema.companies.id))
       .innerJoin(
         schema.announcementCategories,
         eq(schema.announcements.categoryId, schema.announcementCategories.id)
@@ -172,7 +175,8 @@ searchRoutes.get('/', async (c) => {
       .where(
         and(
           eq(schema.announcements.moderationStatus, 'published'),
-          eq(schema.companies.status, 'active')
+          eq(schema.users.status, 'active'),
+          or(isNull(schema.announcements.companyId), eq(schema.companies.status, 'active'))
         )
       )
       .orderBy(desc(schema.announcements.createdAt))
@@ -180,21 +184,22 @@ searchRoutes.get('/', async (c) => {
 
     announcements = rawAnns
       .filter((a) => {
-        if (industryFilter && !a.companyIndustry.toLowerCase().includes(industryFilter)) {
+        if (industryFilter && !(a.companyIndustry || '').toLowerCase().includes(industryFilter)) {
           return false;
         }
         if (
           locationFilter &&
-          !a.companyHeadquarters.toLowerCase().includes(locationFilter)
+          !(a.companyHeadquarters || '').toLowerCase().includes(locationFilter)
         ) {
           return false;
         }
         if (!q) return true;
         const haystack = [
           a.body,
-          a.companyName,
+          a.companyName || '',
+          a.authorName,
           a.categoryName,
-          a.companyIndustry,
+          a.companyIndustry || '',
         ]
           .join(' ')
           .toLowerCase();

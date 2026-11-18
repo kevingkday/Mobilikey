@@ -15,20 +15,14 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Composer state for users with managed companies
+  // Composer state for signed-in users (individual or managed company)
   const [showComposer, setShowComposer] = useState(false);
-  const [companyId, setCompanyId] = useState(user?.managedCompanies[0]?.id || '');
+  const [companyId, setCompanyId] = useState('');
   const [categoryId, setCategoryId] = useState<string>(ANNOUNCEMENT_CATEGORIES[0].id);
   const [body, setBody] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [composerError, setComposerError] = useState('');
-
-  useEffect(() => {
-    if (user?.managedCompanies.length && !companyId) {
-      setCompanyId(user.managedCompanies[0].id);
-    }
-  }, [user, companyId]);
 
   const loadAnnouncements = useCallback(async () => {
     setLoading(true);
@@ -60,7 +54,7 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
       await apiFetch('/api/announcements', {
         method: 'POST',
         body: JSON.stringify({
-          companyId,
+          companyId: companyId || null,
           categoryId,
           body,
           externalUrl: externalUrl.trim() || null,
@@ -129,11 +123,9 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
         {/* Header & Feed Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border border-[#E2E8F0] bg-white p-4">
           <div>
-            <h1 className="text-lg font-bold text-[#1F2937]">
-              Company Announcements Feed
-            </h1>
+            <h1 className="text-lg font-bold text-[#1F2937]">Announcements Feed</h1>
             <p className="text-xs text-[#64748B]">
-              Chronological, factual business updates without social clutter.
+              Chronological, factual updates from professionals and companies without social clutter.
             </p>
           </div>
 
@@ -165,7 +157,7 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
               </div>
             )}
 
-            {user && user.managedCompanies.length > 0 && (
+            {user && (
               <button
                 type="button"
                 onClick={() => setShowComposer((v) => !v)}
@@ -179,15 +171,13 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
         </div>
 
         {/* Publish Announcement Composer */}
-        {showComposer && user && user.managedCompanies.length > 0 && (
+        {showComposer && user && (
           <form
             onSubmit={handlePublish}
             className="rounded-md border border-[#243B53]/30 bg-white p-5 space-y-4"
           >
             <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-              <h2 className="text-sm font-semibold text-[#1F2937]">
-                Publish Official Company Announcement
-              </h2>
+              <h2 className="text-sm font-semibold text-[#1F2937]">Publish Announcement</h2>
               <span className="text-xs text-[#64748B]">Maximum 500 characters</span>
             </div>
 
@@ -200,13 +190,14 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-[#1F2937] mb-1">
-                  Publishing Company
+                  Publish As
                 </label>
                 <select
                   value={companyId}
                   onChange={(e) => setCompanyId(e.target.value)}
                   className="w-full rounded border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#1F2937]"
                 >
+                  <option value="">{user.name} (Personal / Individual)</option>
                   {user.managedCompanies.map((mc) => (
                     <option key={mc.id} value={mc.id}>
                       {mc.name} ({mc.role})

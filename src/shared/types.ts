@@ -186,13 +186,16 @@ export interface MessageItem {
 
 export interface AnnouncementItem {
   id: string;
-  companyId: string;
-  companyName: string;
-  companySlug: string;
+  companyId: string | null;
+  companyName: string | null;
+  companySlug: string | null;
   companyLogoUrl: string | null;
-  companyIndustry: string;
+  companyIndustry: string | null;
   authorUserId: string;
   authorName: string;
+  authorSlug: string;
+  authorHeadline: string;
+  authorAvatarUrl: string | null;
   categoryId: string;
   categoryName: string;
   categorySlug: string;
@@ -201,6 +204,7 @@ export interface AnnouncementItem {
   moderationStatus: 'published' | 'flagged' | 'removed';
   createdAt: number;
   isFollowingCompany?: boolean;
+  isFollowingAuthor?: boolean;
 }
 
 export interface AccessPermissionRecord {
