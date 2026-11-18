@@ -52,12 +52,12 @@ export function SearchPage() {
     runSearch();
   }, [runSearch]);
 
-  async function handleToggleFollowCompany(companyId: string) {
+  async function handleToggleFollow(targetType: 'user' | 'company', targetId: string) {
     if (!user) return;
     try {
       await apiFetch('/api/users/follow', {
         method: 'POST',
-        body: JSON.stringify({ targetType: 'company', targetId: companyId }),
+        body: JSON.stringify({ targetType, targetId }),
       });
       await runSearch();
     } catch {
@@ -199,24 +199,45 @@ export function SearchPage() {
                             View Profile
                           </Link>
                           {user && user.id !== person.id && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openComposeModal({
-                                  type: 'user',
-                                  id: person.id,
-                                  name: person.name,
-                                  subtitle: [person.position, person.companyName]
-                                    .filter(Boolean)
-                                    .join(' · '),
-                                  accessLevel: person.viewerAccessToUser ?? 1,
-                                })
-                              }
-                              className="inline-flex items-center gap-1 rounded bg-[#243B53] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1B2D40]"
-                            >
-                              <Mail className="h-3 w-3" />
-                              <span>Message</span>
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFollow('user', person.id)}
+                                className="inline-flex items-center gap-1 rounded border border-[#E2E8F0] bg-[#F7F9FB] px-2.5 py-1 text-xs font-medium text-[#1F2937]"
+                              >
+                                {person.isFollowing ? (
+                                  <>
+                                    <UserCheck className="h-3 w-3 text-[#287D7D]" />
+                                    <span>Following</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="h-3 w-3" />
+                                    <span>Follow</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openComposeModal({
+                                    type: 'user',
+                                    id: person.id,
+                                    name: person.name,
+                                    subtitle: [person.position, person.companyName]
+                                      .filter(Boolean)
+                                      .join(' · '),
+                                    accessLevel: person.viewerAccessToUser ?? 1,
+                                    isFollowing: Boolean(person.isFollowing),
+                                    onFollowed: runSearch,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 rounded bg-[#243B53] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1B2D40]"
+                              >
+                                <Mail className="h-3 w-3" />
+                                <span>{person.isFollowing ? 'Message' : 'Follow & Message'}</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -278,7 +299,7 @@ export function SearchPage() {
                             {user && (
                               <button
                                 type="button"
-                                onClick={() => handleToggleFollowCompany(comp.id)}
+                                onClick={() => handleToggleFollow('company', comp.id)}
                                 className="inline-flex items-center gap-1 rounded border border-[#E2E8F0] bg-[#F7F9FB] px-2.5 py-1 text-xs font-medium text-[#526579] hover:text-[#1F2937]"
                               >
                                 {comp.isFollowing ? (

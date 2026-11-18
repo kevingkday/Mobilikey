@@ -64,12 +64,26 @@ searchRoutes.get('/', async (c) => {
     people = await Promise.all(
       matchedUsers.slice(0, 30).map(async (u) => {
         let viewerAccessToUser: AccessLevelValue = ACCESS_LEVELS.GENERAL;
+        let isFollowing = false;
         if (viewer && viewer.id !== u.id) {
           viewerAccessToUser = await AccessService.getAccessLevel(db, viewer.id, 'user', u.id);
+          const flw = await db
+            .select({ id: schema.follows.id })
+            .from(schema.follows)
+            .where(
+              and(
+                eq(schema.follows.followerUserId, viewer.id),
+                eq(schema.follows.targetType, 'user'),
+                eq(schema.follows.targetUserId, u.id)
+              )
+            )
+            .limit(1);
+          isFollowing = Boolean(flw[0]);
         }
         return {
           ...u,
           viewerAccessToUser,
+          isFollowing,
         };
       })
     );

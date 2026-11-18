@@ -333,13 +333,17 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
                 key={ann.id}
                 announcement={ann}
                 onDelete={handleDeleteAnnouncement}
-                onFollowChange={(compId, following) => {
+                onFollowChange={(targetId, following) => {
                   setAnnouncements((prev) =>
-                    prev.map((item) =>
-                      item.companyId === compId
-                        ? { ...item, isFollowingCompany: following }
-                        : item
-                    )
+                    prev.map((item) => {
+                      if (item.companyId === targetId) {
+                        return { ...item, isFollowingCompany: following };
+                      }
+                      if (!item.companyId && item.authorUserId === targetId) {
+                        return { ...item, isFollowingAuthor: following };
+                      }
+                      return item;
+                    })
                   );
                 }}
               />

@@ -107,7 +107,15 @@ export function AnnouncementCard({
                     {formatRelativeTime(announcement.createdAt)}
                   </time>
                   <span>·</span>
-                  <span>Published by {announcement.authorName}</span>
+                  <span>
+                    Published by{' '}
+                    <Link
+                      to={`/p/${announcement.authorSlug}`}
+                      className="font-medium text-[#526579] hover:text-[#243B53] hover:underline"
+                    >
+                      {announcement.authorName}
+                    </Link>
+                  </span>
                 </>
               ) : (
                 <>
