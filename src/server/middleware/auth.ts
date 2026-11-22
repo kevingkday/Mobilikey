@@ -5,7 +5,7 @@ import type { AppContext } from '../env';
 import { sessions, users } from '../db/schema';
 import { sha256Hex } from '../services/auth.service';
 
-export const SESSION_COOKIE_NAME = 'mobilikey_session';
+export const SESSION_COOKIE_NAME = 'keylenta_session';
 
 export async function sessionMiddleware(c: Context<AppContext>, next: Next) {
   c.set('user', null);

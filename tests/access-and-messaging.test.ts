@@ -6,7 +6,7 @@ import { MessageService } from '../src/server/services/message.service';
 import { ACCESS_LEVELS } from '../src/shared/constants';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
-describe('Mobilikey Three-Level Messaging Access & Authorization Suite', () => {
+describe('Keylenta Three-Level Messaging Access & Authorization Suite', () => {
   let db: DrizzleD1Database<typeof schema>;
 
   const now = Date.now();

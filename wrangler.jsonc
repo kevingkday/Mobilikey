@@ -18,9 +18,9 @@
   ],
   "vars": {
     "ENVIRONMENT": "production",
-    "APP_URL": "https://mobilikey.com",
+    "APP_URL": "https://keylenta.com",
     "EMAIL_PROVIDER": "console",
-    "EMAIL_FROM": "notifications@mobilikey.com"
+    "EMAIL_FROM": "notifications@keylenta.com"
   }
 }
 

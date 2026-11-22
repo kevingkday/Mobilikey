@@ -87,7 +87,7 @@ export function FeedPage({ publicOnly = false }: { publicOnly?: boolean }) {
           Editorial Standards
         </h3>
         <p className="mt-2 text-xs leading-relaxed text-[#526579]">
-          Mobilikey announcements are strictly factual business updates limited to 500 characters.
+          Keylenta announcements are strictly factual business updates limited to 500 characters.
         </p>
         <ul className="mt-2.5 space-y-1.5 text-xs text-[#64748B]">
           <li>• Product launches & milestones</li>

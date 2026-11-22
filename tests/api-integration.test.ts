@@ -7,7 +7,7 @@ import {
   parseProfileDocumentText,
 } from '../src/server/services/profile-import.service';
 
-describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
+describe('Keylenta Full-Stack API Integration & Security Suite', () => {
   let env: Env;
 
   beforeEach(() => {
@@ -41,7 +41,7 @@ describe('Mobilikey Full-Stack API Integration & Security Suite', () => {
     );
     expect(res.status).toBe(201);
     const setCookieHeader = res.headers.get('set-cookie') || '';
-    const cookieMatch = setCookieHeader.match(/mobilikey_session=[^;]+/);
+    const cookieMatch = setCookieHeader.match(/keylenta_session=[^;]+/);
     const cookie = cookieMatch ? cookieMatch[0] : '';
     const data = (await res.json()) as any;
     return {

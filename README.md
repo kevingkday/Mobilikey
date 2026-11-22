@@ -1,8 +1,8 @@
-# Mobilikey
+# Keylenta
 
 > **Earn access. Build connections.**
 
-Mobilikey (`mobilikey.com`) is a simplified, high-credibility professional networking and business communications application built on **Cloudflare Workers**, **Cloudflare D1 (SQLite)**, **Drizzle ORM**, **React**, **TypeScript**, and **Tailwind CSS**.
+Keylenta (`keylenta.com`) is a simplified, high-credibility professional networking and business communications application built on **Cloudflare Workers**, **Cloudflare D1 (SQLite)**, **Drizzle ORM**, **React**, **TypeScript**, and **Tailwind CSS**.
 
 Its primary differentiator is a **directional, recipient-controlled three-level messaging access system** (`Level 1 — General Access`, `Level 2 — Recognized Access`, `Level 3 — Direct Access`, plus `Blocked`) paired with a chronological feed of **factual 500-character company announcements**.
 

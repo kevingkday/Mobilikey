@@ -164,7 +164,7 @@ export function ComposeMessageModal() {
                     Step 1: Follow {composeTarget.name} Before Messaging
                   </h4>
                   <p className="mt-1 text-xs text-[#526579] leading-relaxed">
-                    On Mobilikey, you must follow a recipient before sending a message. Following
+                    On Keylenta, you must follow a recipient before sending a message. Following
                     starts you at <strong>Level 1 — General Access</strong> by default so{' '}
                     {composeTarget.name} can view you in their Followers list and manage your access
                     level (Level 1–3).

@@ -92,7 +92,7 @@ export async function sendTransactionalEmail(
   payload: TransactionalEmailPayload
 ): Promise<{ delivered: boolean; provider: string; to: string }> {
   const provider = (env.EMAIL_PROVIDER || 'console').toLowerCase();
-  const from = env.EMAIL_FROM || 'Mobilikey <notifications@mobilikey.com>';
+  const from = env.EMAIL_FROM || 'Keylenta <notifications@keylenta.com>';
 
   if (provider === 'resend' && env.EMAIL_API_KEY) {
     try {
@@ -141,14 +141,14 @@ export async function sendTransactionalEmail(
   // Default / local development safe console logger
   if (env.ENVIRONMENT === 'development') {
     console.info(
-      `[Mobilikey Email (${provider})] To: ${payload.to} | Subject: ${payload.subject}\n${payload.text}`
+      `[Keylenta Email (${provider})] To: ${payload.to} | Subject: ${payload.subject}\n${payload.text}`
     );
   }
   return { delivered: true, provider: 'console', to: payload.to };
 }
 
 /**
- * Forwards an inbound Mobilikey message to the recipient's configured email address
+ * Forwards an inbound Keylenta message to the recipient's configured email address
  * for the sender's exact access level (Level 1 -> e.g. info@, Level 2 -> e.g. work@, Level 3 -> e.g. personal@).
  * The recipient's email address is NEVER exposed to the sender.
  */
@@ -177,7 +177,7 @@ export async function forwardInboundMessageToEmail(
     return { forwarded: false, targetEmail: null, provider: 'none' };
   }
 
-  const appUrl = (env.APP_URL || 'https://mobilikey.kevin-c8e.workers.dev').replace(/\/$/, '');
+  const appUrl = (env.APP_URL || 'https://keylenta.com').replace(/\/$/, '');
   const threadUrl = `${appUrl}/messages?conversationId=${encodeURIComponent(params.conversationId)}`;
   const levelLabel = ACCESS_LEVEL_LABELS[params.senderAccessLevel];
   const shortLevelTag =
@@ -187,12 +187,12 @@ export async function forwardInboundMessageToEmail(
       ? 'Level 2 Recognized'
       : 'Level 1 General';
 
-  const emailSubject = `[Mobilikey · ${shortLevelTag}] Message from ${params.senderName}${
+  const emailSubject = `[Keylenta · ${shortLevelTag}] Message from ${params.senderName}${
     params.subject ? `: ${params.subject}` : ''
   }`;
 
   const text = [
-    `Mobilikey Tiered Inbox Forwarding (${levelLabel})`,
+    `Keylenta Tiered Inbox Forwarding (${levelLabel})`,
     params.inboxContextLabel ? `Inbox: ${params.inboxContextLabel}` : null,
     `From: ${params.senderName}${params.senderSubtitle ? ` (${params.senderSubtitle})` : ''}`,
     `Access Level: ${levelLabel}`,
@@ -211,7 +211,7 @@ export async function forwardInboundMessageToEmail(
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 6px; background: #FFFFFF; color: #1F2937;">
       <div style="background: #243B53; color: #FFFFFF; padding: 14px 20px; border-radius: 6px 6px 0 0;">
         <div style="font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.04em;">
-          Mobilikey Tiered Email Forwarding · ${levelLabel}
+          Keylenta Tiered Email Forwarding · ${levelLabel}
         </div>
         <div style="font-size: 16px; font-weight: 700; margin-top: 4px;">
           ${params.senderName}

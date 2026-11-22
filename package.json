@@ -2,7 +2,7 @@
   "name": "mobilikey",
   "version": "1.0.0",
   "private": true,
-  "description": "Mobilikey — Professional networking, factual business announcements, and three-level messaging access system.",
+  "description": "Keylenta — Professional networking, factual business announcements, and three-level messaging access system.",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:worker\" \"npm:dev:client\"",

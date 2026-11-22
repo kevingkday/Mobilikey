@@ -77,7 +77,7 @@ export function LandingPage() {
         <section className="rounded-md border border-[#E2E8F0] bg-white p-8 sm:p-12">
           <div className="max-w-3xl space-y-5">
             <div className="inline-flex items-center gap-2 rounded border border-[#E2E8F0] bg-[#F7F9FB] px-3 py-1 text-xs font-medium text-[#243B53]">
-              <span>Mobilikey Professional Directory & Communications</span>
+              <span>Keylenta Professional Directory & Communications</span>
               <span className="text-[#64748B]">·</span>
               <span className="text-[#287D7D]">Earn access. Build connections.</span>
             </div>

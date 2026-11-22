@@ -441,7 +441,7 @@ companiesRoutes.post('/:id/members', requireAuth, async (c) => {
   const targetUser = userRows[0];
   if (!targetUser) {
     return c.json(
-      { error: 'No active Mobilikey professional account found with that email address.' },
+      { error: 'No active Keylenta professional account found with that email address.' },
       404
     );
   }

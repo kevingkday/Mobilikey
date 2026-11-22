@@ -18,7 +18,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7F9FB] text-xs text-[#64748B]">
-        Loading Mobilikey...
+        Loading Keylenta...
       </div>
     );
   }
@@ -33,7 +33,7 @@ function HomeRoute() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7F9FB] text-xs text-[#64748B]">
-        Loading Mobilikey...
+        Loading Keylenta...
       </div>
     );
   }

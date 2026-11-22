@@ -832,7 +832,7 @@ export function PublicProfilePage() {
   useEffect(() => {
     if (!profile) return;
     const originalTitle = document.title;
-    const pageTitle = `${profile.name} — ${profile.headline || profile.position || 'Professional Profile'} | Mobilikey`;
+    const pageTitle = `${profile.name} — ${profile.headline || profile.position || 'Professional Profile'} | Keylenta`;
     document.title = pageTitle;
 
     // OpenGraph & Meta description
@@ -843,11 +843,11 @@ export function PublicProfilePage() {
       document.head.appendChild(metaDesc);
     }
     const cleanBio = profile.biography ? profile.biography.replace(/\s+/g, ' ').slice(0, 160) : '';
-    const descContent = cleanBio || `${profile.name}'s verified professional credentials, industry leadership, and contact access on Mobilikey.`;
+    const descContent = cleanBio || `${profile.name}'s verified professional credentials, industry leadership, and contact access on Keylenta.`;
     metaDesc.setAttribute('content', descContent);
 
     // JSON-LD structured data for Google Rich Results (Person schema)
-    const scriptId = 'mobilikey-person-schema';
+    const scriptId = 'keylenta-person-schema';
     let scriptTag = document.getElementById(scriptId) as HTMLScriptElement | null;
     if (!scriptTag) {
       scriptTag = document.createElement('script');

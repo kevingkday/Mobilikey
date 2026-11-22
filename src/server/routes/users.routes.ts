@@ -425,11 +425,11 @@ usersRoutes.post('/me/test-forwarding', requireAuth, async (c) => {
     recipientPrimaryEmail: userRows[0].email,
     recipientName: userRows[0].name,
     recipientEmailNotifPrefsJson: userRows[0].emailNotifPrefsJson,
-    senderName: 'Mobilikey Routing Verification',
+    senderName: 'Keylenta Routing Verification',
     senderSubtitle: 'System Test · Tiered Inbox Forwarding',
     senderAccessLevel: level as AccessLevelValue,
     subject: `Level ${level} Forwarding Verification`,
-    body: `This is a test message confirming your Level ${level} email forwarding rule on Mobilikey.`,
+    body: `This is a test message confirming your Level ${level} email forwarding rule on Keylenta.`,
     conversationId: 'test_routing',
   });
 
@@ -460,7 +460,7 @@ usersRoutes.delete('/me', requireAuth, async (c) => {
     .set({
       status: 'deleted',
       name: 'Deleted Professional',
-      email: `deleted_${viewer.id}@deleted.mobilikey.invalid`,
+      email: `deleted_${viewer.id}@deleted.keylenta.invalid`,
       headline: '',
       biography: '',
       website: '',
@@ -511,7 +511,7 @@ usersRoutes.get('/:slugOrId', async (c) => {
   // Respect privacy setting: if profile is not public, require authentication
   if (u.isPublic === 0 && !viewer) {
     return c.json(
-      { error: 'This professional profile is visible to signed-in Mobilikey members only.' },
+      { error: 'This professional profile is visible to signed-in Keylenta members only.' },
       403
     );
   }

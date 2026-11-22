@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Mobilikey',
-        short_name: 'Mobilikey',
+        name: 'Keylenta',
+        short_name: 'Keylenta',
         description:
           'Professional networking, factual business announcements, and recipient-controlled three-level messaging access.',
         theme_color: '#243B53',

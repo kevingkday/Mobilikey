@@ -73,7 +73,7 @@ export function ReportModal() {
           <div className="p-5 space-y-4">
             <p className="text-sm text-[#1F2937]">
               Thank you. Your report regarding <strong>{reportTarget.targetLabel}</strong> has been
-              logged for review by Mobilikey moderators.
+              logged for review by Keylenta moderators.
             </p>
             <div className="flex justify-end">
               <button

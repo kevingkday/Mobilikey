@@ -24,7 +24,7 @@ app.use('/api/*', csrfMiddleware);
 
 app.get('/api/health', (c) => {
   return c.json({
-    service: 'mobilikey-api',
+    service: 'keylenta-api',
     status: 'ok',
     tagline: 'Earn access. Build connections.',
     timestamp: Date.now(),
@@ -50,7 +50,7 @@ app.all('*', async (c) => {
   if (c.env.ASSETS) {
     return c.env.ASSETS.fetch(c.req.raw);
   }
-  return c.text('Mobilikey Worker API is running.', 200);
+  return c.text('Keylenta Worker API is running.', 200);
 });
 
 export default app;

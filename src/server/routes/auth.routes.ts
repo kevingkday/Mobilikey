@@ -29,7 +29,7 @@ import type { AuthenticatedUser, ManagedCompanySummary } from '../../shared/type
 export const authRoutes = new Hono<AppContext>();
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const OAUTH_STATE_COOKIE = 'mobilikey_oauth_state';
+const OAUTH_STATE_COOKIE = 'keylenta_oauth_state';
 
 /**
  * Initiates Google OAuth 2.0 Authorization Code flow.
@@ -419,8 +419,8 @@ authRoutes.post('/signup', async (c) => {
 
   await sendTransactionalEmail(c.env, {
     to: normalizedEmail,
-    subject: 'Welcome to Mobilikey — Verify your email address',
-    text: `Hello ${name},\n\nWelcome to Mobilikey. Verify your email using code: ${rawVerifyToken}\n\nEarn access. Build connections.`,
+    subject: 'Welcome to Keylenta — Verify your email address',
+    text: `Hello ${name},\n\nWelcome to Keylenta. Verify your email using code: ${rawVerifyToken}\n\nEarn access. Build connections.`,
   });
 
   // Create session
@@ -573,7 +573,7 @@ authRoutes.post('/forgot-password', async (c) => {
 
     await sendTransactionalEmail(c.env, {
       to: normalizedEmail,
-      subject: 'Mobilikey — Password Reset Instructions',
+      subject: 'Keylenta — Password Reset Instructions',
       text: `Hello ${rows[0].name},\n\nUse the following reset token to set a new password: ${rawToken}\nThis token expires in 60 minutes.`,
     });
 

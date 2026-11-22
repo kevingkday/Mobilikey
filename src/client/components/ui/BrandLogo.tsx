@@ -1,0 +1,34 @@
+import React from 'react';
+
+/**
+ * Keylenta brand mark: horizontal key with a right-pointing arrow tip.
+ */
+export function BrandLogo({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 64 64"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Bow (rounded rectangular handle with inner cutout) */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M11.2 24.5C9.43269 24.5 8 25.9327 8 27.7V36.3C8 38.0673 9.43269 39.5 11.2 39.5H23.8C25.5673 39.5 27 38.0673 27 36.3V27.7C27 25.9327 25.5673 24.5 23.8 24.5H11.2ZM13.7 29C13.0373 29 12.5 29.5373 12.5 30.2V33.8C12.5 34.4627 13.0373 35 13.7 35H21.3C21.9627 35 22.5 34.4627 22.5 33.8V30.2C22.5 29.5373 21.9627 29 21.3 29H13.7Z"
+        fill="currentColor"
+      />
+      {/* Shaft */}
+      <rect x="25" y="29.75" width="26" height="4.5" fill="currentColor" />
+      {/* Key teeth */}
+      <rect x="34" y="33.5" width="4.5" height="6" rx="1.1" fill="currentColor" />
+      <rect x="42.5" y="33.5" width="4.5" height="6" rx="1.1" fill="currentColor" />
+      {/* Arrowhead tip */}
+      <path
+        d="M49.5 27.3C49.5 26.27 50.68 25.7 51.49 26.34L56.25 30.89C56.85 31.46 56.85 32.54 56.25 33.11L51.49 37.66C50.68 38.3 49.5 37.73 49.5 36.7V27.3Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

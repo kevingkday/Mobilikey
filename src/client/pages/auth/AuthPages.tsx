@@ -77,7 +77,7 @@ export function LoginPage() {
       <div className="mx-auto max-w-md py-8">
         <div className="rounded-md border border-[#E2E8F0] bg-white p-6 sm:p-8">
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-[#1F2937]">Sign in to Mobilikey</h1>
+            <h1 className="text-xl font-bold text-[#1F2937]">Sign in to Keylenta</h1>
             <p className="mt-1 text-xs text-[#64748B]">
               Access your professional inbox, network, and company announcements.
             </p>
@@ -145,7 +145,7 @@ export function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-xs text-[#64748B]">
-            New to Mobilikey?{' '}
+            New to Keylenta?{' '}
             <Link to="/signup" className="font-semibold text-[#243B53] hover:underline">
               Create a free account
             </Link>
@@ -215,7 +215,7 @@ export function SignUpPage() {
       <div className="mx-auto max-w-lg py-6">
         <div className="rounded-md border border-[#E2E8F0] bg-white p-6 sm:p-8">
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-[#1F2937]">Join Mobilikey</h1>
+            <h1 className="text-xl font-bold text-[#1F2937]">Join Keylenta</h1>
             <p className="mt-1 text-xs text-[#64748B]">
               Free professional directory profile and recipient-controlled messaging.
             </p>
@@ -445,7 +445,7 @@ export function ForgotPasswordPage() {
         <div className="rounded-md border border-[#E2E8F0] bg-white p-6 sm:p-8">
           <h1 className="text-xl font-bold text-[#1F2937]">Reset Password</h1>
           <p className="mt-1 text-xs text-[#64748B]">
-            Recover access to your Mobilikey account.
+            Recover access to your Keylenta account.
           </p>
 
           {error && (

@@ -11,10 +11,10 @@ import {
   Settings,
   Shield,
   LogOut,
-  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth-context';
 import { EntityAvatar } from '../ui/AccessBadge';
+import { BrandLogo } from '../ui/BrandLogo';
 import { ComposeMessageModal } from '../messaging/ComposeMessageModal';
 import { ReportModal } from '../ui/ReportModal';
 
@@ -43,11 +43,11 @@ export function AppShell({
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
             <Link to="/" className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded bg-[#243B53] text-white">
-                <KeyRound className="h-4 w-4" />
+                <BrandLogo className="h-5 w-5" />
               </div>
               <div className="flex flex-col">
                 <span className="text-base font-bold tracking-tight text-[#243B53] leading-none">
-                  Mobilikey
+                  Keylenta
                 </span>
                 <span className="text-[10px] font-medium text-[#64748B]">
                   Earn access. Build connections.
@@ -88,7 +88,7 @@ export function AppShell({
 
         <footer className="border-t border-[#E2E8F0] bg-white py-5 text-xs text-[#64748B]">
           <div className="mx-auto flex max-w-6xl flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6">
-            <span>© {new Date().getFullYear()} Mobilikey. Earn access. Build connections.</span>
+            <span>© {new Date().getFullYear()} Keylenta. Earn access. Build connections.</span>
             <div className="flex items-center gap-4">
               <Link to="/announcements" className="hover:text-[#1F2937]">
                 Public Announcements
@@ -120,11 +120,11 @@ export function AppShell({
           <div className="flex items-center gap-6">
             <Link to="/feed" className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded bg-[#243B53] text-white">
-                <KeyRound className="h-4 w-4" />
+                <BrandLogo className="h-5 w-5" />
               </div>
               <div className="flex flex-col">
                 <span className="text-base font-bold tracking-tight text-[#243B53] leading-none">
-                  Mobilikey
+                  Keylenta
                 </span>
                 <span className="text-[10px] font-medium text-[#64748B] hidden sm:inline">
                   Earn access. Build connections.

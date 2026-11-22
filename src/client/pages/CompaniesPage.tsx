@@ -660,7 +660,7 @@ export function PublicCompanyPage() {
                   required
                   value={memberEmail}
                   onChange={(e) => setMemberEmail(e.target.value)}
-                  placeholder="Add team member by Mobilikey email..."
+                  placeholder="Add team member by Keylenta email..."
                   className="flex-1 rounded border border-[#E2E8F0] px-3 py-1.5 text-xs text-[#1F2937]"
                 />
                 <select

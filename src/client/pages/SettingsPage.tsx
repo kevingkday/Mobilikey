@@ -248,7 +248,7 @@ export function SettingsPage() {
                 </span>
                 <span className="block text-xs text-[#64748B]">
                   Allow your professional profile to be viewed publicly. When disabled, only
-                  signed-in Mobilikey members can view your profile.
+                  signed-in Keylenta members can view your profile.
                 </span>
               </div>
             </label>
@@ -283,7 +283,7 @@ export function SettingsPage() {
                 </h2>
               </div>
               <p className="mt-1 text-xs text-[#64748B] leading-relaxed">
-                Choose whether inbound Mobilikey messages are forwarded to your email, and assign a
+                Choose whether inbound Keylenta messages are forwarded to your email, and assign a
                 <strong> different destination email for each access level</strong> (for example,{' '}
                 <code>info@company.com</code> for Level 1, a work inbox for Level 2, and your
                 personal or executive email for Level 3). Senders never see your forwarding email
@@ -486,7 +486,7 @@ export function SettingsPage() {
             <h2 className="text-sm font-bold">Account Deletion</h2>
           </div>
           <p className="text-xs text-[#526579]">
-            Permanently deactivate your Mobilikey account, revoke active sessions, and scrub your
+            Permanently deactivate your Keylenta account, revoke active sessions, and scrub your
             public profile details.
           </p>
           {!confirmDelete ? (
