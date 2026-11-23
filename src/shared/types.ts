@@ -98,6 +98,70 @@ export interface ManagedCompanySummary {
   role: CompanyMemberRole;
 }
 
+export type CompanyFollowSource = 'admin_seeded' | 'user';
+
+export interface CompanyFollowItem {
+  id: string;
+  companyId: string;
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+  industry: string;
+  website: string;
+  isClaimed: boolean;
+  source: CompanyFollowSource;
+  reason: string | null;
+  sourceUrl: string | null;
+  createdAt: number;
+}
+
+export interface BulkImportCompanyFollowsResult {
+  dryRun: boolean;
+  created: Array<{
+    followerSlug: string;
+    followedSlug: string;
+    bothWays: boolean;
+    placeholderCreated: boolean;
+  }>;
+  skipped: Array<{
+    followerSlug: string;
+    followedSlug: string;
+    reason: string;
+  }>;
+  placeholdersCreated: Array<{
+    slug: string;
+    name: string;
+    website: string;
+  }>;
+  notMatched: Array<{
+    company: string;
+    context: string;
+  }>;
+}
+
+export interface BulkImportCompaniesResult {
+  dryRun: boolean;
+  companiesCreated: number;
+  companiesMatched: number;
+  updatesCreated: number;
+  updatesSkipped: number;
+  createdCompanies: Array<{
+    slug: string;
+    name: string;
+    website: string;
+  }>;
+  matchedCompanies: Array<{
+    slug: string;
+    name: string;
+  }>;
+  errors: Array<{
+    row: number;
+    slug?: string;
+    name?: string;
+    error: string;
+  }>;
+}
+
 export interface CompanyProfile {
   id: string;
   slug: string;
@@ -112,6 +176,7 @@ export interface CompanyProfile {
   contactEmail: string;
   contactPhone: string;
   socialLinks: SocialLinks;
+  isClaimed: boolean;
   status: 'active' | 'suspended';
   createdAt: number;
   followerCount?: number;
@@ -138,6 +203,8 @@ export interface CompanyProfile {
     followedAt: number;
     accessLevelToCompany: AccessLevelValue;
   }>;
+  companyFollows?: CompanyFollowItem[];
+  companyFollowedBy?: CompanyFollowItem[];
 }
 
 export interface ConversationSummary {

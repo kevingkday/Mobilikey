@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { drizzle, DrizzleD1Database } from 'drizzle-orm/d1';
 import * as schema from '../src/server/db/schema';
@@ -64,11 +64,14 @@ export function createTestDb(): {
   sqlite: DatabaseSync;
 } {
   const sqlite = new DatabaseSync(':memory:');
-  const migrationSql = readFileSync(
-    resolve(process.cwd(), 'drizzle/0000_initial_schema.sql'),
-    'utf-8'
-  );
-  sqlite.exec(migrationSql);
+  const drizzleDir = resolve(process.cwd(), 'drizzle');
+  const migrationFiles = readdirSync(drizzleDir)
+    .filter((f) => /^\d{4}_.*\.sql$/.test(f))
+    .sort();
+  for (const file of migrationFiles) {
+    const migrationSql = readFileSync(resolve(drizzleDir, file), 'utf-8');
+    sqlite.exec(migrationSql);
+  }
 
   const d1 = {
     prepare(query: string) {

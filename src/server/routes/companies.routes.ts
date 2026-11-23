@@ -6,10 +6,18 @@ import {
   createCompanySchema,
   updateCompanySchema,
   addCompanyMemberSchema,
+  createCompanyFollowSchema,
 } from '../../shared/validation';
 import { requireAuth } from '../middleware/auth';
 import { AccessService } from '../services/access.service';
 import { generateId, slugify } from '../services/auth.service';
+import {
+  claimCompanyPage,
+  createCompanyFollow,
+  getFollowedCompaniesUpdates,
+  listCompanyFollows,
+  removeCompanyFollow,
+} from '../services/company-follows.service';
 import { ACCESS_LEVELS, type AccessLevelValue } from '../../shared/constants';
 import type { CompanyMemberRole, CompanyProfile, SocialLinks } from '../../shared/types';
 
@@ -101,6 +109,7 @@ companiesRoutes.get('/', async (c) => {
         contactEmail: comp.contactEmail,
         contactPhone: comp.contactPhone,
         socialLinks: parseSocialLinks(comp.socialLinksJson),
+        isClaimed: Boolean(comp.isClaimed),
         status: comp.status as 'active' | 'suspended',
         createdAt: comp.createdAt,
         followerCount: flwRows.length,
@@ -333,6 +342,12 @@ companiesRoutes.get('/:slugOrId', async (c) => {
     .orderBy(desc(schema.announcements.createdAt))
     .limit(20);
 
+  const [{ follows: companyFollows, followedBy: companyFollowedBy }, followedCompaniesUpdates] =
+    await Promise.all([
+      listCompanyFollows(db, comp.id),
+      getFollowedCompaniesUpdates(db, comp.id, 15),
+    ]);
+
   const profile: CompanyProfile = {
     id: comp.id,
     slug: comp.slug,
@@ -347,6 +362,7 @@ companiesRoutes.get('/:slugOrId', async (c) => {
     contactEmail: comp.contactEmail,
     contactPhone: comp.contactPhone,
     socialLinks: parseSocialLinks(comp.socialLinksJson),
+    isClaimed: Boolean(comp.isClaimed),
     status: comp.status as 'active' | 'suspended',
     createdAt: comp.createdAt,
     followerCount: flwRows.length,
@@ -358,10 +374,13 @@ companiesRoutes.get('/:slugOrId', async (c) => {
       role: m.role as CompanyMemberRole,
     })),
     followers: companyFollowers,
+    companyFollows,
+    companyFollowedBy,
   };
 
   return c.json({
     company: profile,
+    followedCompaniesUpdates,
     announcements: recentAnnouncements.map((a) => ({
       ...a,
       companyName: comp.name,
@@ -507,5 +526,112 @@ companiesRoutes.delete('/:id/members/:memberId', requireAuth, async (c) => {
   }
 
   await db.delete(schema.companyMembers).where(eq(schema.companyMembers.id, memberId));
+  return c.json({ ok: true });
+});
+
+companiesRoutes.post('/:id/follows', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+  const companyId = c.req.param('id')!;
+
+  const isCompanyAdmin = await AccessService.isCompanyInboxAdmin(db, viewer.id, companyId);
+  const isPlatformAdmin = viewer.systemRole === 'admin';
+  if (!isCompanyAdmin && !isPlatformAdmin) {
+    return c.json(
+      { error: 'Only company owners/administrators or platform admins can manage company follows.' },
+      403
+    );
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = createCompanyFollowSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message || 'Invalid follow request' }, 400);
+  }
+
+  const targetCompany = await db
+    .select({ id: schema.companies.id })
+    .from(schema.companies)
+    .where(eq(schema.companies.id, parsed.data.followedCompanyId))
+    .limit(1);
+  if (!targetCompany[0]) {
+    return c.json({ error: 'Target company not found.' }, 404);
+  }
+
+  const source = isPlatformAdmin && !isCompanyAdmin ? 'admin_seeded' : isPlatformAdmin ? 'admin_seeded' : 'user';
+  const result = await createCompanyFollow(db, {
+    followerCompanyId: companyId,
+    followedCompanyId: parsed.data.followedCompanyId,
+    source,
+    reason: isPlatformAdmin ? parsed.data.reason : null,
+    sourceUrl: isPlatformAdmin ? parsed.data.sourceUrl : null,
+    bothWays: isPlatformAdmin ? parsed.data.bothWays : false,
+  });
+
+  if (result.error) {
+    return c.json({ error: result.error }, 400);
+  }
+
+  return c.json(
+    {
+      ok: true,
+      created: result.created,
+      reverseCreated: result.reverseCreated,
+    },
+    201
+  );
+});
+
+companiesRoutes.delete('/:id/follows/:followedCompanyId', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+  const companyId = c.req.param('id')!;
+  const followedCompanyId = c.req.param('followedCompanyId')!;
+
+  const isCompanyAdmin = await AccessService.isCompanyInboxAdmin(db, viewer.id, companyId);
+  const isPlatformAdmin = viewer.systemRole === 'admin';
+  if (!isCompanyAdmin && !isPlatformAdmin) {
+    return c.json(
+      { error: 'Only company owners/administrators or platform admins can remove company follows.' },
+      403
+    );
+  }
+
+  const removed = await removeCompanyFollow(db, companyId, followedCompanyId);
+  if (!removed) {
+    return c.json({ error: 'Follow relationship not found.' }, 404);
+  }
+
+  return c.json({ ok: true });
+});
+
+companiesRoutes.post('/:id/claim', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+  const companyId = c.req.param('id')!;
+
+  const userRows = await db
+    .select({ emailVerifiedAt: schema.users.emailVerifiedAt })
+    .from(schema.users)
+    .where(eq(schema.users.id, viewer.id))
+    .limit(1);
+
+  if (!userRows[0]?.emailVerifiedAt) {
+    return c.json(
+      { error: 'Please verify your email address before claiming a company page.' },
+      403
+    );
+  }
+
+  const outcome = await claimCompanyPage(db, {
+    companyId,
+    userId: viewer.id,
+    userEmail: viewer.email,
+  });
+
+  if (!outcome.ok) {
+    return c.json({ error: outcome.error }, outcome.status as 400 | 403 | 404);
+  }
+
   return c.json({ ok: true });
 });

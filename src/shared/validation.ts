@@ -187,6 +187,69 @@ export const addCompanyMemberSchema = z.object({
   role: z.enum(['admin', 'publisher']).default('admin'),
 });
 
+export const createCompanyFollowSchema = z.object({
+  followedCompanyId: z.string().trim().min(1, 'Target company is required'),
+  reason: z
+    .string()
+    .trim()
+    .max(140, 'Reason cannot exceed 140 characters')
+    .optional()
+    .nullable(),
+  sourceUrl: optionalUrlSchema.optional().nullable(),
+  bothWays: z.boolean().optional().default(false),
+});
+
+export const bulkImportFollowEntrySchema = z.object({
+  company: z.string().trim().min(1, 'Followed company slug or domain is required'),
+  name: z.string().trim().min(1).max(120).optional(),
+  website: optionalUrlSchema.optional(),
+  reason: z.string().trim().max(140, 'Reason cannot exceed 140 characters').optional().nullable(),
+  source_url: optionalUrlSchema.optional().nullable(),
+  both_ways: z.boolean().optional().default(false),
+});
+
+export const bulkImportCompanyItemSchema = z.object({
+  company: z.string().trim().min(1, 'Source company slug or domain is required'),
+  follows: z.array(bulkImportFollowEntrySchema).min(1, 'At least one follow entry is required'),
+});
+
+export const bulkImportCompanyFollowsBodySchema = z.union([
+  z.array(bulkImportCompanyItemSchema),
+  z.object({
+    items: z.array(bulkImportCompanyItemSchema),
+    dry_run: z.boolean().optional().default(false),
+  }),
+]);
+
+export const bulkImportCompanyUpdateRowSchema = z.object({
+  slug: z.string().trim().min(1, 'Company slug is required').max(120),
+  name: z.string().trim().min(1, 'Company name is required').max(120),
+  website: optionalUrlSchema.optional().default(''),
+  headquarters: z.string().trim().max(120).optional().default(''),
+  industry: z.string().trim().max(100).optional().default(''),
+  description: z.string().trim().max(1000).optional().default(''),
+  update: z
+    .object({
+      body: z
+        .string()
+        .trim()
+        .min(1, 'Update body is required')
+        .max(500, 'Update body cannot exceed 500 characters'),
+      external_url: optionalUrlSchema.optional().nullable(),
+      category: z.string().trim().max(100).optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+});
+
+export const bulkImportCompaniesBodySchema = z.union([
+  z.array(z.unknown()),
+  z.object({
+    items: z.array(z.unknown()),
+    dry_run: z.boolean().optional().default(false),
+  }),
+]);
+
 export const startConversationSchema = z.object({
   recipientType: z.enum(['user', 'company']),
   recipientId: z.string().min(1),

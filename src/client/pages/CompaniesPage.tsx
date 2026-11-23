@@ -245,6 +245,8 @@ export function PublicCompanyPage() {
 
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [followedCompaniesUpdates, setFollowedCompaniesUpdates] = useState<AnnouncementItem[]>([]);
+  const [allCompanies, setAllCompanies] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingCompany, setEditingCompany] = useState(false);
@@ -254,6 +256,20 @@ export function PublicCompanyPage() {
   const [memberRole, setMemberRole] = useState<'admin' | 'publisher'>('admin');
   const [memberError, setMemberError] = useState('');
 
+  // Company-to-company follow management
+  const [targetFollowCompanyId, setTargetFollowCompanyId] = useState('');
+  const [followReason, setFollowReason] = useState('');
+  const [followSourceUrl, setFollowSourceUrl] = useState('');
+  const [followBothWays, setFollowBothWays] = useState(false);
+  const [followError, setFollowError] = useState('');
+  const [followSaving, setFollowSaving] = useState(false);
+
+  // Claiming / admin owner assignment
+  const [claimError, setClaimError] = useState('');
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [assignOwnerEmail, setAssignOwnerEmail] = useState('');
+  const [assignOwnerMsg, setAssignOwnerMsg] = useState('');
+
   const loadCompany = useCallback(async () => {
     if (!slug) return;
     setLoading(true);
@@ -261,9 +277,11 @@ export function PublicCompanyPage() {
       const res = await apiFetch<{
         company: CompanyProfile;
         announcements: AnnouncementItem[];
+        followedCompaniesUpdates?: AnnouncementItem[];
       }>(`/api/companies/${slug}`);
       setCompany(res.company);
       setAnnouncements(res.announcements || []);
+      setFollowedCompaniesUpdates(res.followedCompaniesUpdates || []);
     } catch (err: any) {
       setError(err.message || 'Company not found');
     } finally {
@@ -274,6 +292,18 @@ export function PublicCompanyPage() {
   useEffect(() => {
     loadCompany();
   }, [loadCompany]);
+
+  const isPlatformAdmin = user?.systemRole === 'admin';
+  const isCompanyAdmin =
+    company?.viewerRole === 'owner' || company?.viewerRole === 'admin';
+  const canManageCompanyFollows = Boolean(isPlatformAdmin || isCompanyAdmin);
+
+  useEffect(() => {
+    if (!canManageCompanyFollows) return;
+    apiFetch<{ companies: CompanyProfile[] }>('/api/companies')
+      .then((res) => setAllCompanies(res.companies || []))
+      .catch(() => {});
+  }, [canManageCompanyFollows]);
 
   async function handleToggleFollow() {
     if (!company || !user) return;
@@ -355,8 +385,76 @@ export function PublicCompanyPage() {
     setEditingCompany(false);
   }
 
-  const isCompanyAdmin =
-    company?.viewerRole === 'owner' || company?.viewerRole === 'admin';
+  async function handleAddCompanyFollow(e: React.FormEvent) {
+    e.preventDefault();
+    if (!company || !targetFollowCompanyId) return;
+    setFollowError('');
+    setFollowSaving(true);
+    try {
+      await apiFetch(`/api/companies/${company.id}/follows`, {
+        method: 'POST',
+        body: JSON.stringify({
+          followedCompanyId: targetFollowCompanyId,
+          reason: isPlatformAdmin ? followReason.trim() || null : null,
+          sourceUrl: isPlatformAdmin ? followSourceUrl.trim() || null : null,
+          bothWays: isPlatformAdmin ? followBothWays : false,
+        }),
+      });
+      setTargetFollowCompanyId('');
+      setFollowReason('');
+      setFollowSourceUrl('');
+      setFollowBothWays(false);
+      await loadCompany();
+    } catch (err: any) {
+      setFollowError(err.message || 'Could not add company follow');
+    } finally {
+      setFollowSaving(false);
+    }
+  }
+
+  async function handleRemoveCompanyFollow(followedCompanyId: string) {
+    if (!company) return;
+    setFollowError('');
+    try {
+      await apiFetch(`/api/companies/${company.id}/follows/${followedCompanyId}`, {
+        method: 'DELETE',
+      });
+      await loadCompany();
+    } catch (err: any) {
+      setFollowError(err.message || 'Could not remove company follow');
+    }
+  }
+
+  async function handleClaimCompany() {
+    if (!company) return;
+    setClaimError('');
+    setClaimLoading(true);
+    try {
+      await apiFetch(`/api/companies/${company.id}/claim`, { method: 'POST' });
+      await Promise.all([loadCompany(), refreshUser()]);
+    } catch (err: any) {
+      setClaimError(err.message || 'Could not claim this page.');
+    } finally {
+      setClaimLoading(false);
+    }
+  }
+
+  async function handleAssignOwner(e: React.FormEvent) {
+    e.preventDefault();
+    if (!company || !assignOwnerEmail.trim()) return;
+    setAssignOwnerMsg('');
+    try {
+      await apiFetch(`/api/admin/companies/${company.id}/assign-owner`, {
+        method: 'POST',
+        body: JSON.stringify({ email: assignOwnerEmail.trim() }),
+      });
+      setAssignOwnerEmail('');
+      setAssignOwnerMsg('Owner assigned.');
+      await loadCompany();
+    } catch (err: any) {
+      setAssignOwnerMsg(err.message || 'Could not assign owner');
+    }
+  }
 
   return (
     <AppShell>
@@ -579,6 +677,256 @@ export function PublicCompanyPage() {
             </div>
           </div>
 
+          {!company.isClaimed && (() => {
+            const sourceUrl = announcements.find(
+              (a) => a.externalUrl && /^https?:\/\//i.test(a.externalUrl)
+            )?.externalUrl;
+            return (
+              <div className="rounded-md border border-[#E2E8F0] bg-white p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-[#526579]">
+                    This page was written from a public announcement and has not been claimed yet.
+                    {sourceUrl && (
+                      <>
+                        {' '}
+                        <a
+                          href={sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-[#287D7D] hover:underline"
+                        >
+                          View source
+                        </a>
+                      </>
+                    )}
+                  </p>
+                {user ? (
+                  <button
+                    type="button"
+                    disabled={claimLoading}
+                    onClick={handleClaimCompany}
+                    className="rounded bg-[#243B53] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40] disabled:opacity-50"
+                  >
+                    {claimLoading ? 'Claiming...' : 'Claim this page'}
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="rounded border border-[#E2E8F0] bg-[#F7F9FB] px-3 py-1.5 text-xs font-medium text-[#243B53] hover:bg-white"
+                  >
+                    Sign in to claim
+                  </Link>
+                )}
+              </div>
+
+              {claimError && (
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {claimError}
+                </div>
+              )}
+
+              {isPlatformAdmin && (
+                <form
+                  onSubmit={handleAssignOwner}
+                  className="flex flex-wrap items-center gap-2 border-t border-[#E2E8F0] pt-3"
+                >
+                  <input
+                    type="email"
+                    required
+                    value={assignOwnerEmail}
+                    onChange={(e) => setAssignOwnerEmail(e.target.value)}
+                    placeholder="Admin: assign owner by account email..."
+                    className="flex-1 min-w-[220px] rounded border border-[#E2E8F0] px-2.5 py-1 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded border border-[#CBD5E1] bg-[#F7F9FB] px-3 py-1 text-xs font-semibold text-[#243B53] hover:bg-white"
+                  >
+                    Assign Owner
+                  </button>
+                  {assignOwnerMsg && (
+                    <span className="text-xs text-[#526579]">{assignOwnerMsg}</span>
+                  )}
+                </form>
+              )}
+            </div>
+            );
+          })()}
+
+          {/* Company-to-Company Follows & Followed By */}
+          <div className="rounded-md border border-[#E2E8F0] bg-white p-6 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Follows */}
+              <div className="space-y-2.5">
+                <h2 className="text-sm font-bold text-[#1F2937]">
+                  Follows ({company.companyFollows?.length ?? 0})
+                </h2>
+                {!company.companyFollows || company.companyFollows.length === 0 ? (
+                  <p className="text-xs text-[#64748B]">Not following any companies yet.</p>
+                ) : (
+                  <div className="divide-y divide-[#E2E8F0] rounded border border-[#E2E8F0]">
+                    {company.companyFollows.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-start justify-between gap-2 p-2.5 hover:bg-[#F7F9FB]"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            to={`/companies/${item.slug}`}
+                            className="text-xs font-semibold text-[#243B53] hover:underline block truncate"
+                          >
+                            {item.name}
+                          </Link>
+                          {item.reason && (
+                            <p className="mt-0.5 text-[11px] text-[#64748B]">
+                              {item.reason}
+                              {item.sourceUrl && (
+                                <>
+                                  {' · '}
+                                  <a
+                                    href={item.sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#287D7D] hover:underline"
+                                  >
+                                    Source
+                                  </a>
+                                </>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        {canManageCompanyFollows && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCompanyFollow(item.companyId)}
+                            className="shrink-0 text-[11px] font-medium text-[#64748B] hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Followed by */}
+              <div className="space-y-2.5">
+                <h2 className="text-sm font-bold text-[#1F2937]">
+                  Followed by ({company.companyFollowedBy?.length ?? 0})
+                </h2>
+                {!company.companyFollowedBy || company.companyFollowedBy.length === 0 ? (
+                  <p className="text-xs text-[#64748B]">No companies following yet.</p>
+                ) : (
+                  <div className="divide-y divide-[#E2E8F0] rounded border border-[#E2E8F0]">
+                    {company.companyFollowedBy.map((item) => (
+                      <div key={item.id} className="p-2.5 hover:bg-[#F7F9FB]">
+                        <Link
+                          to={`/companies/${item.slug}`}
+                          className="text-xs font-semibold text-[#243B53] hover:underline block truncate"
+                        >
+                          {item.name}
+                        </Link>
+                        {item.reason && (
+                          <p className="mt-0.5 text-[11px] text-[#64748B]">
+                            {item.reason}
+                            {item.sourceUrl && (
+                              <>
+                                {' · '}
+                                <a
+                                  href={item.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#287D7D] hover:underline"
+                                >
+                                  Source
+                                </a>
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {canManageCompanyFollows && (
+              <form
+                onSubmit={handleAddCompanyFollow}
+                className="border-t border-[#E2E8F0] pt-4 space-y-2.5"
+              >
+                <div className="text-xs font-semibold text-[#1F2937]">
+                  {isPlatformAdmin ? 'Add Company Follow (Admin Seed)' : 'Follow Another Company'}
+                </div>
+                {followError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">
+                    {followError}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    required
+                    value={targetFollowCompanyId}
+                    onChange={(e) => setTargetFollowCompanyId(e.target.value)}
+                    className="flex-1 min-w-[200px] rounded border border-[#E2E8F0] bg-white px-2.5 py-1.5 text-xs"
+                  >
+                    <option value="">Select company to follow...</option>
+                    {allCompanies
+                      .filter(
+                        (c) =>
+                          c.id !== company.id &&
+                          !(company.companyFollows || []).some((f) => f.companyId === c.id)
+                      )
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.slug})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={followSaving || !targetFollowCompanyId}
+                    className="rounded bg-[#243B53] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40] disabled:opacity-50"
+                  >
+                    {followSaving ? 'Saving...' : 'Add Follow'}
+                  </button>
+                </div>
+
+                {isPlatformAdmin && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      maxLength={140}
+                      value={followReason}
+                      onChange={(e) => setFollowReason(e.target.value)}
+                      placeholder="Optional reason (max 140 chars, e.g. Led their seed round)"
+                      className="rounded border border-[#E2E8F0] px-2.5 py-1.5 text-xs"
+                    />
+                    <input
+                      type="url"
+                      value={followSourceUrl}
+                      onChange={(e) => setFollowSourceUrl(e.target.value)}
+                      placeholder="Optional source URL (https://...)"
+                      className="rounded border border-[#E2E8F0] px-2.5 py-1.5 text-xs"
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-[#526579] sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={followBothWays}
+                        onChange={(e) => setFollowBothWays(e.target.checked)}
+                        className="rounded border-[#CBD5E1]"
+                      />
+                      <span>Link both ways (create follow in each direction)</span>
+                    </label>
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+
           {editingCompany && isCompanyAdmin && (
             <CompanyProfileForm
               title={`Edit ${company.name}`}
@@ -763,6 +1111,24 @@ export function PublicCompanyPage() {
             ) : (
               <div className="space-y-3">
                 {announcements.map((ann) => (
+                  <AnnouncementCard key={ann.id} announcement={ann} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent from companies <name> follows */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-[#1F2937]">
+              Recent from companies {company.name} follows ({followedCompaniesUpdates.length})
+            </h2>
+            {followedCompaniesUpdates.length === 0 ? (
+              <div className="rounded-md border border-[#E2E8F0] bg-white p-6 text-xs text-[#64748B]">
+                No recent updates from companies {company.name} follows yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {followedCompaniesUpdates.map((ann) => (
                   <AnnouncementCard key={ann.id} announcement={ann} />
                 ))}
               </div>

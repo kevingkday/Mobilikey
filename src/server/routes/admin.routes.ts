@@ -4,6 +4,15 @@ import type { AppContext } from '../env';
 import * as schema from '../db/schema';
 import { requireAdmin } from '../middleware/auth';
 import { generateId, slugify } from '../services/auth.service';
+import {
+  bulkImportCompaniesBodySchema,
+  bulkImportCompanyFollowsBodySchema,
+} from '../../shared/validation';
+import {
+  assignCompanyOwner,
+  bulkImportCompanyFollows,
+} from '../services/company-follows.service';
+import { bulkImportCompaniesWithUpdates } from '../services/company-import.service';
 
 export const adminRoutes = new Hono<AppContext>();
 
@@ -405,5 +414,67 @@ adminRoutes.patch('/categories/:id', async (c) => {
   });
 
   return c.json({ ok: true });
+});
+
+adminRoutes.post('/company-follows/import', async (c) => {
+  const db = c.get('db');
+  const body = await c.req.json().catch(() => null);
+  const parsed = bulkImportCompanyFollowsBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues[0]?.message || 'Invalid bulk import JSON payload' },
+      400
+    );
+  }
+
+  const queryDryRun = c.req.query('dry_run') === 'true';
+  const items = Array.isArray(parsed.data) ? parsed.data : parsed.data.items;
+  const bodyDryRun = Array.isArray(parsed.data) ? false : Boolean(parsed.data.dry_run);
+  const dryRun = queryDryRun || bodyDryRun;
+
+  const summary = await bulkImportCompanyFollows(db, items, { dryRun });
+  return c.json(summary);
+});
+
+adminRoutes.post('/companies/import', async (c) => {
+  const db = c.get('db');
+  const adminUser = c.get('user')!;
+  const body = await c.req.json().catch(() => null);
+  const parsed = bulkImportCompaniesBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues[0]?.message || 'Invalid bulk import JSON payload' },
+      400
+    );
+  }
+
+  const queryDryRun = c.req.query('dry_run') === 'true';
+  const items = Array.isArray(parsed.data) ? parsed.data : parsed.data.items;
+  const bodyDryRun = Array.isArray(parsed.data) ? false : Boolean(parsed.data.dry_run);
+  const dryRun = queryDryRun || bodyDryRun;
+
+  const summary = await bulkImportCompaniesWithUpdates(db, items, {
+    adminUserId: adminUser.id,
+    dryRun,
+  });
+  return c.json(summary);
+});
+
+adminRoutes.post('/companies/:id/assign-owner', async (c) => {
+  const db = c.get('db');
+  const companyId = c.req.param('id')!;
+  const body = await c.req.json().catch(() => null);
+  const email = typeof body?.email === 'string' ? body.email.trim() : '';
+
+  if (!email) {
+    return c.json({ error: 'Account email is required.' }, 400);
+  }
+
+  const outcome = await assignCompanyOwner(db, { companyId, userEmail: email });
+  if (!outcome.ok) {
+    return c.json({ error: outcome.error }, outcome.status as 400 | 404);
+  }
+
+  return c.json({ ok: true, userId: outcome.userId });
 });
 

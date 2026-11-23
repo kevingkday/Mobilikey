@@ -13,6 +13,10 @@ import { AppShell } from '../../components/layout/AppShell';
 import { formatRelativeTime } from '../../components/ui/AccessBadge';
 import { useAuth } from '../../lib/auth-context';
 import { apiFetch } from '../../lib/api';
+import type {
+  BulkImportCompaniesResult,
+  BulkImportCompanyFollowsResult,
+} from '../../../shared/types';
 
 export function AdminDashboardPage() {
   const { user } = useAuth();
@@ -27,6 +31,17 @@ export function AdminDashboardPage() {
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [bulkJson, setBulkJson] = useState('');
+  const [bulkDryRun, setBulkDryRun] = useState(true);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkResult, setBulkResult] = useState<BulkImportCompanyFollowsResult | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+
+  const [companiesJson, setCompaniesJson] = useState('');
+  const [companiesDryRun, setCompaniesDryRun] = useState(true);
+  const [companiesError, setCompaniesError] = useState('');
+  const [companiesResult, setCompaniesResult] = useState<BulkImportCompaniesResult | null>(null);
+  const [companiesRunning, setCompaniesRunning] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -294,7 +309,201 @@ export function AdminDashboardPage() {
             </div>
           </div>
         ) : tab === 'companies' ? (
-          <div className="rounded-md border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0]">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-md border border-[#E2E8F0] bg-white p-5 space-y-3">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1F2937]">
+                    Bulk Import Unclaimed Companies & Updates
+                  </h2>
+                  <p className="text-xs text-[#64748B]">
+                    Paste a JSON array of companies with optional public announcements. Matches
+                    existing companies by slug or domain without changing their profile.
+                  </p>
+                </div>
+                <textarea
+                  rows={5}
+                  value={companiesJson}
+                  onChange={(e) => setCompaniesJson(e.target.value)}
+                  placeholder='[{"slug":"luminaryx","name":"LUMINARYX","website":"https://luminaryx.ca","headquarters":"Golden, BC","industry":"AI / GovTech","update":{"body":"Launched new municipal AI workflow.","external_url":"https://example.com/article"}}]'
+                  className="w-full rounded border border-[#E2E8F0] px-3 py-2 font-mono text-xs"
+                />
+                {companiesError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {companiesError}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <label className="inline-flex items-center gap-2 text-xs text-[#526579]">
+                    <input
+                      type="checkbox"
+                      checked={companiesDryRun}
+                      onChange={(e) => setCompaniesDryRun(e.target.checked)}
+                      className="rounded border-[#CBD5E1]"
+                    />
+                    <span>Dry run (preview summary without writing)</span>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={companiesRunning || !companiesJson.trim()}
+                    onClick={async () => {
+                      setCompaniesError('');
+                      setCompaniesResult(null);
+                      let parsed: unknown;
+                      try {
+                        parsed = JSON.parse(companiesJson);
+                      } catch {
+                        setCompaniesError('Invalid JSON syntax.');
+                        return;
+                      }
+                      setCompaniesRunning(true);
+                      try {
+                        const res = await apiFetch<BulkImportCompaniesResult>(
+                          `/api/admin/companies/import?dry_run=${companiesDryRun ? 'true' : 'false'}`,
+                          {
+                            method: 'POST',
+                            body: JSON.stringify(parsed),
+                          }
+                        );
+                        setCompaniesResult(res);
+                        if (!companiesDryRun) {
+                          await loadData();
+                        }
+                      } catch (err: any) {
+                        setCompaniesError(err.message || 'Bulk import failed');
+                      } finally {
+                        setCompaniesRunning(false);
+                      }
+                    }}
+                    className="rounded bg-[#243B53] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40] disabled:opacity-50"
+                  >
+                    {companiesRunning
+                      ? 'Running...'
+                      : companiesDryRun
+                        ? 'Preview Import'
+                        : 'Run Import'}
+                  </button>
+                </div>
+                {companiesResult && (
+                  <div className="rounded border border-[#E2E8F0] bg-[#F7F9FB] p-3 text-xs space-y-1.5">
+                    <div className="font-semibold text-[#1F2937]">
+                      {companiesResult.dryRun ? 'Dry-Run Summary' : 'Import Summary'}:{' '}
+                      {companiesResult.companiesCreated} companies created ·{' '}
+                      {companiesResult.companiesMatched} matched ·{' '}
+                      {companiesResult.updatesCreated} updates created ·{' '}
+                      {companiesResult.updatesSkipped} skipped
+                    </div>
+                    {companiesResult.errors.length > 0 && (
+                      <div className="text-red-700 space-y-0.5">
+                        <div className="font-semibold">
+                          Errors ({companiesResult.errors.length}):
+                        </div>
+                        {companiesResult.errors.map((err, idx) => (
+                          <p key={idx}>
+                            Row {err.row + 1}
+                            {err.slug ? ` (${err.slug})` : ''}: {err.error}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-md border border-[#E2E8F0] bg-white p-5 space-y-3">
+                <div>
+                  <h2 className="text-sm font-bold text-[#1F2937]">Bulk Import Company Follows</h2>
+                  <p className="text-xs text-[#64748B]">
+                    Paste a JSON array of company follow rules. Matches by slug or website domain and
+                    creates unclaimed placeholder pages for missing followed companies.
+                  </p>
+                </div>
+              <textarea
+                rows={5}
+                value={bulkJson}
+                onChange={(e) => setBulkJson(e.target.value)}
+                placeholder='[{"company":"rise-automation","follows":[{"company":"bdc-capital","name":"BDC Capital","website":"https://bdc.ca","reason":"Led their pre-seed","both_ways":true}]}]'
+                className="w-full rounded border border-[#E2E8F0] px-3 py-2 font-mono text-xs"
+              />
+              {bulkError && (
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {bulkError}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="inline-flex items-center gap-2 text-xs text-[#526579]">
+                  <input
+                    type="checkbox"
+                    checked={bulkDryRun}
+                    onChange={(e) => setBulkDryRun(e.target.checked)}
+                    className="rounded border-[#CBD5E1]"
+                  />
+                  <span>Dry run (preview summary without writing)</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={bulkRunning || !bulkJson.trim()}
+                  onClick={async () => {
+                    setBulkError('');
+                    setBulkResult(null);
+                    let parsed: unknown;
+                    try {
+                      parsed = JSON.parse(bulkJson);
+                    } catch {
+                      setBulkError('Invalid JSON syntax.');
+                      return;
+                    }
+                    setBulkRunning(true);
+                    try {
+                      const res = await apiFetch<BulkImportCompanyFollowsResult>(
+                        `/api/admin/company-follows/import?dry_run=${bulkDryRun ? 'true' : 'false'}`,
+                        {
+                          method: 'POST',
+                          body: JSON.stringify(parsed),
+                        }
+                      );
+                      setBulkResult(res);
+                      if (!bulkDryRun) {
+                        await loadData();
+                      }
+                    } catch (err: any) {
+                      setBulkError(err.message || 'Bulk import failed');
+                    } finally {
+                      setBulkRunning(false);
+                    }
+                  }}
+                  className="rounded bg-[#243B53] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40] disabled:opacity-50"
+                >
+                  {bulkRunning ? 'Running...' : bulkDryRun ? 'Preview Import' : 'Run Import'}
+                </button>
+              </div>
+              {bulkResult && (
+                <div className="rounded border border-[#E2E8F0] bg-[#F7F9FB] p-3 text-xs space-y-1.5">
+                  <div className="font-semibold text-[#1F2937]">
+                    {bulkResult.dryRun ? 'Dry-Run Summary' : 'Import Summary'}:{' '}
+                    {bulkResult.created.length} created · {bulkResult.skipped.length} skipped ·{' '}
+                    {bulkResult.placeholdersCreated.length} placeholders ·{' '}
+                    {bulkResult.notMatched.length} not matched
+                  </div>
+                  {bulkResult.placeholdersCreated.length > 0 && (
+                    <p className="text-[#526579]">
+                      Placeholders:{' '}
+                      {bulkResult.placeholdersCreated
+                        .map((p) => `${p.name} (${p.slug})`)
+                        .join(', ')}
+                    </p>
+                  )}
+                  {bulkResult.notMatched.length > 0 && (
+                    <p className="text-red-700">
+                      Not matched: {bulkResult.notMatched.map((m) => m.company).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0]">
             {companiesList.map((comp) => (
               <div
                 key={comp.id}
@@ -336,6 +545,7 @@ export function AdminDashboardPage() {
                 </button>
               </div>
             ))}
+            </div>
           </div>
         ) : tab === 'reports' ? (
           <div className="rounded-md border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0]">

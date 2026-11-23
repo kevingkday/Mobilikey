@@ -96,6 +96,7 @@ export const companies = sqliteTable(
     contactEmail: text('contact_email').notNull().default(''),
     contactPhone: text('contact_phone').notNull().default(''),
     socialLinksJson: text('social_links_json').notNull().default('{}'),
+    isClaimed: integer('is_claimed').notNull().default(1), // 1 = claimed, 0 = unclaimed placeholder
     status: text('status').notNull().default('active'), // 'active' | 'suspended'
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -255,6 +256,28 @@ export const follows = sqliteTable(
     index('idx_follows_follower').on(table.followerUserId),
     index('idx_follows_target_user').on(table.targetUserId),
     index('idx_follows_target_company').on(table.targetCompanyId),
+  ]
+);
+
+export const companyFollows = sqliteTable(
+  'company_follows',
+  {
+    id: text('id').primaryKey(),
+    followerCompanyId: text('follower_company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    followedCompanyId: text('followed_company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    source: text('source').notNull().default('user'), // 'admin_seeded' | 'user'
+    reason: text('reason'),
+    sourceUrl: text('source_url'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_company_follows_pair').on(table.followerCompanyId, table.followedCompanyId),
+    index('idx_company_follows_follower').on(table.followerCompanyId, table.createdAt),
+    index('idx_company_follows_followed').on(table.followedCompanyId, table.createdAt),
   ]
 );
 
