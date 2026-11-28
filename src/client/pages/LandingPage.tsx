@@ -8,6 +8,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Building2,
+  Bot,
 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AnnouncementCard } from '../components/announcements/AnnouncementCard';
@@ -177,6 +178,60 @@ export function LandingPage() {
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[#287D7D] shrink-0" />
               <span>Company inboxes are isolated from employee personal inboxes</span>
+            </div>
+          </div>
+        </section>
+
+        {/* AI Assistants & MCP Server */}
+        <section className="rounded-md border border-[#E2E8F0] bg-white p-6 sm:p-8">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+            <div className="max-w-2xl space-y-2">
+              <div className="inline-flex items-center gap-1.5 rounded border border-[#E2E8F0] bg-[#F7F9FB] px-2.5 py-1 text-[11px] font-semibold text-[#287D7D]">
+                <Bot className="h-3.5 w-3.5" />
+                <span>Model Context Protocol (MCP)</span>
+              </div>
+              <h2 className="text-lg font-bold text-[#1F2937]">
+                Update Your Profile &amp; Posts Directly from ChatGPT or Other AI Assistants
+              </h2>
+              <p className="text-xs sm:text-sm text-[#526579] leading-relaxed">
+                Keylenta includes a built-in remote MCP server so you can manage your professional
+                presence directly from ChatGPT, Claude, Cursor, or any MCP-compatible chatbot using
+                OAuth or a personal access token.
+              </p>
+            </div>
+
+            <div className="shrink-0 flex flex-col sm:flex-row md:flex-col gap-2">
+              <Link
+                to="/settings"
+                className="inline-flex items-center justify-center gap-2 rounded bg-[#243B53] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1B2D40]"
+              >
+                <span>Connect in Settings</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded border border-[#E2E8F0] bg-[#F7F9FB] p-4">
+              <h3 className="text-xs font-semibold text-[#1F2937]">Update Your Profile</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#526579]">
+                Ask your chatbot to refresh your headline, biography, role, company, expertise tags,
+                or career highlights without overwriting other fields.
+              </p>
+            </div>
+            <div className="rounded border border-[#E2E8F0] bg-[#F7F9FB] p-4">
+              <h3 className="text-xs font-semibold text-[#1F2937]">Publish &amp; Edit Posts</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#526579]">
+                Draft, publish, edit, or delete 500-character factual business announcements directly
+                from chat with automatic category validation.
+              </p>
+            </div>
+            <div className="rounded border border-[#E2E8F0] bg-[#F7F9FB] p-4">
+              <h3 className="text-xs font-semibold text-[#1F2937]">Works with OAuth or Tokens</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#526579]">
+                Connect via <code className="font-mono text-[#243B53]">https://www.keylenta.com/mcp</code>{' '}
+                using one-click OAuth (DCR + PKCE) in ChatGPT or a Bearer token from Settings.
+              </p>
             </div>
           </div>
         </section>
