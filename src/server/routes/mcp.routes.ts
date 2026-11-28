@@ -849,7 +849,10 @@ mcpRoutes.get('/', async (c) => {
       ),
       401
     );
-    res.headers.set('WWW-Authenticate', 'Bearer realm="Keylenta MCP"');
+    res.headers.set(
+      'WWW-Authenticate',
+      `Bearer realm="Keylenta MCP", resource_metadata="${new URL(c.req.url).origin}/.well-known/oauth-protected-resource"`
+    );
     applyCorsHeaders(res.headers);
     return res;
   }
@@ -882,7 +885,10 @@ mcpRoutes.post('/', async (c) => {
       ),
       401
     );
-    res.headers.set('WWW-Authenticate', 'Bearer realm="Keylenta MCP"');
+    res.headers.set(
+      'WWW-Authenticate',
+      `Bearer realm="Keylenta MCP", resource_metadata="${new URL(c.req.url).origin}/.well-known/oauth-protected-resource"`
+    );
     applyCorsHeaders(res.headers);
     return res;
   }

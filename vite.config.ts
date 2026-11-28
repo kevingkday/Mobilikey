@@ -44,10 +44,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/mcp$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/mcp$/, /^\/oauth\//, /^\/\.well-known\//],
         runtimeCaching: [
           {
-            urlPattern: /^\/(api|mcp)(\/.*)?$/i,
+            urlPattern: /^\/(api|mcp|oauth|\.well-known)(\/.*)?$/i,
             handler: 'NetworkOnly',
           },
         ],
@@ -66,6 +66,14 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/mcp': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/oauth': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/.well-known': {
         target: 'http://127.0.0.1:8787',
         changeOrigin: true,
       },

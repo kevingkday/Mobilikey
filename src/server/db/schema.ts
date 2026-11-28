@@ -358,3 +358,42 @@ export const apiTokens = sqliteTable(
   (table) => [index('idx_api_tokens_user_id').on(table.userId)]
 );
 
+export const oauthClients = sqliteTable('oauth_clients', {
+  id: text('id').primaryKey(),
+  clientId: text('client_id').notNull().unique(),
+  clientSecretHash: text('client_secret_hash'),
+  clientName: text('client_name').notNull(),
+  redirectUrisJson: text('redirect_uris_json').notNull(),
+  tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().default('none'),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const oauthCodes = sqliteTable('oauth_codes', {
+  id: text('id').primaryKey(),
+  codeHash: text('code_hash').notNull().unique(),
+  clientId: text('client_id').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  redirectUri: text('redirect_uri').notNull(),
+  scope: text('scope').notNull().default(''),
+  codeChallenge: text('code_challenge').notNull(),
+  codeChallengeMethod: text('code_challenge_method').notNull().default('S256'),
+  expiresAt: integer('expires_at').notNull(),
+  usedAt: integer('used_at'),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const oauthRefreshTokens = sqliteTable('oauth_refresh_tokens', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  clientId: text('client_id').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  scope: text('scope').notNull().default(''),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'),
+  createdAt: integer('created_at').notNull(),
+});
+

@@ -317,4 +317,161 @@ describe('Keylenta MCP Server & Personal Access Tokens', () => {
     const blockedRes = await mcpCall(rawToken, { jsonrpc: '2.0', id: 2, method: 'ping' });
     expect(blockedRes.status).toBe(401);
   });
+
+  it('Supports OAuth 2.1 discovery, Dynamic Client Registration, PKCE authorization, and token refresh for ChatGPT', async () => {
+    const alice = await registerUser('Alice Vance', 'alice@meridian.com');
+
+    // 1. 401 on /mcp advertises resource_metadata
+    const unauthRes = await mcpCall(null, { jsonrpc: '2.0', id: 1, method: 'ping' });
+    expect(unauthRes.status).toBe(401);
+    expect(unauthRes.headers.get('WWW-Authenticate')).toContain('resource_metadata=');
+
+    // 2. Discovery metadata endpoints
+    const prRes = await app.request(
+      'https://www.keylenta.com/.well-known/oauth-protected-resource',
+      { method: 'GET' },
+      env
+    );
+    expect(prRes.status).toBe(200);
+    const prJson = (await prRes.json()) as any;
+    expect(prJson.resource).toBe('https://www.keylenta.com/mcp');
+    expect(prJson.authorization_servers).toEqual(['https://www.keylenta.com']);
+
+    const asRes = await app.request(
+      'https://www.keylenta.com/.well-known/oauth-authorization-server',
+      { method: 'GET' },
+      env
+    );
+    expect(asRes.status).toBe(200);
+    const asJson = (await asRes.json()) as any;
+    expect(asJson.registration_endpoint).toBe('https://www.keylenta.com/oauth/register');
+    expect(asJson.authorization_endpoint).toBe('https://www.keylenta.com/oauth/authorize');
+    expect(asJson.token_endpoint).toBe('https://www.keylenta.com/oauth/token');
+    expect(asJson.code_challenge_methods_supported).toEqual(['S256']);
+
+    // 3. Dynamic Client Registration (DCR)
+    const redirectUri = 'https://chatgpt.com/connector/oauth/abc123';
+    const regRes = await app.request(
+      'https://www.keylenta.com/oauth/register',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_name: 'ChatGPT',
+          redirect_uris: [redirectUri],
+          token_endpoint_auth_method: 'none',
+        }),
+      },
+      env
+    );
+    expect(regRes.status).toBe(201);
+    const regJson = (await regRes.json()) as any;
+    expect(regJson.client_id).toMatch(/^kl_client_/);
+
+    // 4. PKCE S256 challenge
+    const codeVerifier = 'test_pkce_verifier_string_with_sufficient_entropy_123456';
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+    const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // 5. GET /oauth/authorize renders consent page
+    const authGetRes = await app.request(
+      `https://www.keylenta.com/oauth/authorize?response_type=code&client_id=${encodeURIComponent(
+        regJson.client_id
+      )}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&state=xyz&code_challenge=${encodeURIComponent(
+        codeChallenge
+      )}&code_challenge_method=S256`,
+      { method: 'GET', headers: { Cookie: alice.cookie } },
+      env
+    );
+    expect(authGetRes.status).toBe(200);
+    const html = await authGetRes.text();
+    expect(html).toContain('Authorize ChatGPT');
+    expect(html).toContain('Alice Vance');
+
+    // 6. POST /oauth/authorize approves & redirects with code
+    const authPostBody = new URLSearchParams({
+      client_id: regJson.client_id,
+      redirect_uri: redirectUri,
+      scope: 'profile:read profile:write posts:read posts:write',
+      state: 'xyz',
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      action: 'allow',
+    });
+    const authPostRes = await app.request(
+      'https://www.keylenta.com/oauth/authorize',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: alice.cookie,
+        },
+        body: authPostBody.toString(),
+      },
+      env
+    );
+    expect(authPostRes.status).toBe(302);
+    const loc = new URL(authPostRes.headers.get('Location')!);
+    expect(loc.origin + loc.pathname).toBe(redirectUri);
+    expect(loc.searchParams.get('state')).toBe('xyz');
+    const authCode = loc.searchParams.get('code')!;
+    expect(authCode).toMatch(/^kl_code_/);
+
+    // 7. POST /oauth/token exchanges code + verifier for access_token & refresh_token
+    const tokenRes = await app.request(
+      'https://www.keylenta.com/oauth/token',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: authCode,
+          redirect_uri: redirectUri,
+          client_id: regJson.client_id,
+          code_verifier: codeVerifier,
+        }).toString(),
+      },
+      env
+    );
+    expect(tokenRes.status).toBe(200);
+    const tokenJson = (await tokenRes.json()) as any;
+    expect(tokenJson.token_type).toBe('Bearer');
+    expect(tokenJson.access_token).toMatch(/^kl_mcp_/);
+    expect(tokenJson.refresh_token).toMatch(/^kl_rt_/);
+
+    // 8. Access token works on /mcp
+    const mcpRes = await mcpCall(tokenJson.access_token, {
+      jsonrpc: '2.0',
+      id: 99,
+      method: 'tools/call',
+      params: { name: 'get_my_profile', arguments: {} },
+    });
+    expect(mcpRes.status).toBe(200);
+    const profileData = JSON.parse(((await mcpRes.json()) as any).result.content[0].text);
+    expect(profileData.email).toBe('alice@meridian.com');
+
+    // 9. Refresh token rotation works
+    const refreshRes = await app.request(
+      'https://www.keylenta.com/oauth/token',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: tokenJson.refresh_token,
+          client_id: regJson.client_id,
+        }).toString(),
+      },
+      env
+    );
+    expect(refreshRes.status).toBe(200);
+    const refreshJson = (await refreshRes.json()) as any;
+    expect(refreshJson.access_token).toMatch(/^kl_mcp_/);
+    expect(refreshJson.access_token).not.toBe(tokenJson.access_token);
+  });
 });
