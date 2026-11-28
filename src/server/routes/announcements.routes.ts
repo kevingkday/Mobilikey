@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 import { and, asc, desc, eq, isNull, or } from 'drizzle-orm';
 import type { AppContext } from '../env';
 import * as schema from '../db/schema';
-import { createAnnouncementSchema, createReportSchema } from '../../shared/validation';
+import {
+  createAnnouncementSchema,
+  createReportSchema,
+  updateAnnouncementSchema,
+} from '../../shared/validation';
 import { requireAuth } from '../middleware/auth';
 import { generateId } from '../services/auth.service';
 import type { AnnouncementItem } from '../../shared/types';
@@ -197,6 +201,91 @@ announcementsRoutes.post('/', requireAuth, async (c) => {
   });
 
   return c.json({ announcementId }, 201);
+});
+
+announcementsRoutes.patch('/:id', requireAuth, async (c) => {
+  const db = c.get('db');
+  const user = c.get('user')!;
+  const id = c.req.param('id')!;
+
+  const rows = await db
+    .select()
+    .from(schema.announcements)
+    .where(eq(schema.announcements.id, id))
+    .limit(1);
+
+  const ann = rows[0];
+  if (!ann) {
+    return c.json({ error: 'Announcement not found.' }, 404);
+  }
+
+  let isCompanyEditor = false;
+  if (ann.companyId) {
+    const memberRows = await db
+      .select()
+      .from(schema.companyMembers)
+      .where(
+        and(
+          eq(schema.companyMembers.companyId, ann.companyId),
+          eq(schema.companyMembers.userId, user.id)
+        )
+      )
+      .limit(1);
+
+    isCompanyEditor =
+      memberRows[0]?.role === 'owner' || memberRows[0]?.role === 'admin';
+  }
+
+  if (ann.authorUserId !== user.id && !isCompanyEditor && user.systemRole !== 'admin') {
+    return c.json({ error: 'Not authorized to update this announcement.' }, 403);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateAnnouncementSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues[0]?.message || 'Invalid announcement update' },
+      400
+    );
+  }
+
+  const updates: Partial<typeof schema.announcements.$inferInsert> = {};
+
+  if (parsed.data.categoryId !== undefined) {
+    const catRows = await db
+      .select()
+      .from(schema.announcementCategories)
+      .where(
+        and(
+          or(
+            eq(schema.announcementCategories.id, parsed.data.categoryId),
+            eq(schema.announcementCategories.slug, parsed.data.categoryId)
+          ),
+          eq(schema.announcementCategories.isActive, 1)
+        )
+      )
+      .limit(1);
+
+    if (!catRows[0]) {
+      return c.json({ error: 'Selected announcement category is invalid.' }, 400);
+    }
+    updates.categoryId = catRows[0].id;
+  }
+
+  if (parsed.data.body !== undefined) {
+    updates.body = parsed.data.body.trim();
+  }
+
+  if (parsed.data.externalUrl !== undefined) {
+    updates.externalUrl = parsed.data.externalUrl ? parsed.data.externalUrl.trim() : null;
+  }
+
+  await db
+    .update(schema.announcements)
+    .set(updates)
+    .where(eq(schema.announcements.id, id));
+
+  return c.json({ ok: true, announcementId: id });
 });
 
 announcementsRoutes.delete('/:id', requireAuth, async (c) => {

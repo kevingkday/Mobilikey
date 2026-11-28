@@ -277,31 +277,52 @@ export const setAccessLevelSchema = z.object({
   accessLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
 });
 
+export const announcementBodySchema = z
+  .string()
+  .trim()
+  .min(10, 'Announcement must be at least 10 characters')
+  .max(500, 'Announcements are strictly limited to 500 characters')
+  .refine((val) => {
+    const hashtags = val.match(/#[a-zA-Z0-9_]+/g) || [];
+    return hashtags.length <= 2;
+  }, 'Hashtag stuffing is not permitted (maximum 2 hashtags)')
+  .refine((val) => {
+    const lower = val.toLowerCase();
+    const engagementBaitPatterns = [
+      'agree?',
+      'thoughts?',
+      'comment below',
+      'like and share',
+      'drop a comment',
+      'repost this',
+    ];
+    return !engagementBaitPatterns.some((p) => lower.includes(p));
+  }, 'Announcements must be factual business updates without engagement bait phrases.');
+
 export const createAnnouncementSchema = z.object({
   companyId: z.string().trim().optional().nullable(),
   categoryId: z.string().min(1, 'Category is required'),
-  body: z
-    .string()
-    .trim()
-    .min(10, 'Announcement must be at least 10 characters')
-    .max(500, 'Announcements are strictly limited to 500 characters')
-    .refine((val) => {
-      const hashtags = val.match(/#[a-zA-Z0-9_]+/g) || [];
-      return hashtags.length <= 2;
-    }, 'Hashtag stuffing is not permitted (maximum 2 hashtags)')
-    .refine((val) => {
-      const lower = val.toLowerCase();
-      const engagementBaitPatterns = [
-        'agree?',
-        'thoughts?',
-        'comment below',
-        'like and share',
-        'drop a comment',
-        'repost this',
-      ];
-      return !engagementBaitPatterns.some((p) => lower.includes(p));
-    }, 'Announcements must be factual business updates without engagement bait phrases.'),
+  body: announcementBodySchema,
   externalUrl: optionalUrlSchema.optional().nullable(),
+});
+
+export const updateAnnouncementSchema = z
+  .object({
+    categoryId: z.string().min(1, 'Category is required').optional(),
+    body: announcementBodySchema.optional(),
+    externalUrl: optionalUrlSchema.optional().nullable(),
+  })
+  .refine(
+    (val) =>
+      val.categoryId !== undefined ||
+      val.body !== undefined ||
+      val.externalUrl !== undefined,
+    'Provide at least one field (body, categoryId, or externalUrl) to update'
+  );
+
+export const createApiTokenSchema = z.object({
+  name: z.string().trim().min(1, 'Token name is required').max(60, 'Token name cannot exceed 60 characters'),
+  expiresInDays: z.number().int().min(1).max(365).optional().nullable(),
 });
 
 export const createReportSchema = z.object({

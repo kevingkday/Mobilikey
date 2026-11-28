@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, AlertTriangle, MailCheck, Mail, Send, Shield } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, MailCheck, Mail, Send, Shield, Bot, Copy, Key, Trash2 } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell';
 import { AccessBadge } from '../components/ui/AccessBadge';
 import { useAuth } from '../lib/auth-context';
@@ -51,6 +51,75 @@ export function SettingsPage() {
   const [errorBanner, setErrorBanner] = useState('');
   const [testingLevel, setTestingLevel] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // MCP Access Tokens state
+  const [mcpTokens, setMcpTokens] = useState<
+    Array<{
+      id: string;
+      name: string;
+      tokenPrefix: string;
+      lastUsedAt: number | null;
+      expiresAt: number | null;
+      createdAt: number;
+    }>
+  >([]);
+  const [newTokenName, setNewTokenName] = useState('');
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [newlyCreatedToken, setNewlyCreatedToken] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const mcpEndpointUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/mcp` : 'https://keylenta.com/mcp';
+
+  useEffect(() => {
+    if (!user) return;
+    apiFetch<{ tokens: typeof mcpTokens }>('/api/users/me/tokens')
+      .then((res) => setMcpTokens(res.tokens || []))
+      .catch(() => {});
+  }, [user?.id]);
+
+  async function handleCreateToken(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTokenName.trim()) return;
+    setCreatingToken(true);
+    setErrorBanner('');
+    setNewlyCreatedToken(null);
+    try {
+      const res = await apiFetch<{
+        token: (typeof mcpTokens)[number];
+        rawToken: string;
+      }>('/api/users/me/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ name: newTokenName.trim() }),
+      });
+      setMcpTokens((prev) => [res.token, ...prev]);
+      setNewlyCreatedToken(res.rawToken);
+      setNewTokenName('');
+    } catch (err: any) {
+      setErrorBanner(err.message || 'Failed to create MCP token');
+    } finally {
+      setCreatingToken(false);
+    }
+  }
+
+  async function handleRevokeToken(tokenId: string) {
+    setErrorBanner('');
+    try {
+      await apiFetch(`/api/users/me/tokens/${tokenId}`, { method: 'DELETE' });
+      setMcpTokens((prev) => prev.filter((t) => t.id !== tokenId));
+    } catch (err: any) {
+      setErrorBanner(err.message || 'Failed to revoke MCP token');
+    }
+  }
+
+  function handleCopyText(text: string, key: string) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedKey(key);
+        setTimeout(() => setCopiedKey(null), 2000);
+      });
+    }
+  }
 
   useEffect(() => {
     if (user) {
@@ -478,6 +547,114 @@ export function SettingsPage() {
             </button>
           </div>
         </form>
+
+        {/* AI Assistants & MCP Server */}
+        <div className="rounded-md border border-[#E2E8F0] bg-white p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[#1E293B]">
+                <Bot className="h-4 w-4 text-[#287D7D]" />
+                <h2 className="text-sm font-bold">AI Assistants &amp; MCP Server</h2>
+              </div>
+              <p className="text-xs text-[#526579]">
+                Connect ChatGPT, Claude, Cursor, or any MCP-compatible chatbot to view and update
+                your Keylenta profile and factual business posts directly from chat.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded border border-[#E2E8F0] bg-[#F8FAFC] p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#475569]">
+                Remote MCP Endpoint (Streamable HTTP)
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopyText(mcpEndpointUrl, 'endpoint')}
+                className="inline-flex items-center gap-1 rounded border border-[#CBD5E1] bg-white px-2 py-0.5 text-[11px] font-medium text-[#334155] hover:bg-[#F1F5F9]"
+              >
+                <Copy className="h-3 w-3" />
+                {copiedKey === 'endpoint' ? 'Copied' : 'Copy URL'}
+              </button>
+            </div>
+            <code className="block break-all rounded bg-white px-2.5 py-1.5 text-xs font-mono text-[#0F172A] border border-[#E2E8F0]">
+              {mcpEndpointUrl}
+            </code>
+            <p className="text-[11px] text-[#64748B]">
+              In ChatGPT (Apps / Custom Connectors), Claude, or Cursor, add this URL as a remote
+              MCP server and authenticate with <code className="font-mono">Authorization: Bearer &lt;token&gt;</code>.
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateToken} className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={newTokenName}
+              onChange={(e) => setNewTokenName(e.target.value)}
+              placeholder="Token label (e.g., ChatGPT, Claude Desktop)"
+              maxLength={60}
+              className="flex-1 rounded border border-[#CBD5E1] px-3 py-1.5 text-xs text-[#1E293B] focus:border-[#243B53] focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={creatingToken || !newTokenName.trim()}
+              className="inline-flex items-center justify-center gap-1.5 rounded bg-[#243B53] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1B2D40] disabled:opacity-50"
+            >
+              <Key className="h-3.5 w-3.5" />
+              {creatingToken ? 'Generating...' : 'Generate Token'}
+            </button>
+          </form>
+
+          {newlyCreatedToken && (
+            <div className="rounded border border-emerald-300 bg-emerald-50 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-emerald-900">
+                  New MCP Token Created — Copy it now (it will not be shown again)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(newlyCreatedToken, 'rawToken')}
+                  className="inline-flex items-center gap-1 rounded border border-emerald-400 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-900 hover:bg-emerald-100"
+                >
+                  <Copy className="h-3 w-3" />
+                  {copiedKey === 'rawToken' ? 'Copied' : 'Copy Token'}
+                </button>
+              </div>
+              <code className="block break-all rounded bg-white px-2.5 py-1.5 text-xs font-mono text-emerald-950 border border-emerald-200">
+                {newlyCreatedToken}
+              </code>
+            </div>
+          )}
+
+          {mcpTokens.length > 0 && (
+            <div className="divide-y divide-[#E2E8F0] rounded border border-[#E2E8F0]">
+              {mcpTokens.map((tok) => (
+                <div
+                  key={tok.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[#1E293B] truncate">{tok.name}</div>
+                    <div className="text-[11px] text-[#64748B] font-mono">
+                      {tok.tokenPrefix} · Created {new Date(tok.createdAt).toLocaleDateString()}
+                      {tok.lastUsedAt
+                        ? ` · Last used ${new Date(tok.lastUsedAt).toLocaleDateString()}`
+                        : ' · Never used'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRevokeToken(tok.id)}
+                    className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 shrink-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Account Deletion Workflow */}
         <div className="rounded-md border border-red-200 bg-white p-5 space-y-3">

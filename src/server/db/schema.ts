@@ -341,3 +341,20 @@ export const rateLimitBuckets = sqliteTable('rate_limit_buckets', {
   windowStart: integer('window_start').notNull(),
 });
 
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    tokenPrefix: text('token_prefix').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    expiresAt: integer('expires_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('idx_api_tokens_user_id').on(table.userId)]
+);
+

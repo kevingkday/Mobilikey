@@ -10,11 +10,17 @@ import { announcementsRoutes } from './routes/announcements.routes';
 import { searchRoutes } from './routes/search.routes';
 import { notificationsRoutes } from './routes/notifications.routes';
 import { adminRoutes } from './routes/admin.routes';
+import { mcpRoutes } from './routes/mcp.routes';
 
 const app = new Hono<AppContext>();
 
 // Attach Drizzle D1 instance and session/CSRF middleware to all /api/* routes
 app.use('/api/*', async (c, next) => {
+  c.set('db', createDb(c.env.DB));
+  return next();
+});
+
+app.use('/mcp', async (c, next) => {
   c.set('db', createDb(c.env.DB));
   return next();
 });
@@ -39,6 +45,7 @@ app.route('/api/announcements', announcementsRoutes);
 app.route('/api/search', searchRoutes);
 app.route('/api/notifications', notificationsRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/mcp', mcpRoutes);
 
 // Fallback for unknown API routes
 app.all('/api/*', (c) => {

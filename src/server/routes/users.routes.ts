@@ -7,10 +7,11 @@ import {
   updateProfileSchema,
   updateSettingsSchema,
   toggleFollowSchema,
+  createApiTokenSchema,
 } from '../../shared/validation';
 import { requireAuth, SESSION_COOKIE_NAME } from '../middleware/auth';
 import { AccessService } from '../services/access.service';
-import { generateId } from '../services/auth.service';
+import { generateId, generateRandomToken, sha256Hex } from '../services/auth.service';
 import { forwardInboundMessageToEmail } from '../services/email.service';
 import { buildAuthenticatedUserPayload, parseJsonArray } from './auth.routes';
 import type { PublicUserProfile } from '../../shared/types';
@@ -484,6 +485,107 @@ usersRoutes.delete('/me', requireAuth, async (c) => {
   });
 
   deleteCookie(c, SESSION_COOKIE_NAME, { path: '/' });
+  return c.json({ ok: true });
+});
+
+usersRoutes.get('/me/tokens', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+
+  const rows = await db
+    .select({
+      id: schema.apiTokens.id,
+      name: schema.apiTokens.name,
+      tokenPrefix: schema.apiTokens.tokenPrefix,
+      lastUsedAt: schema.apiTokens.lastUsedAt,
+      expiresAt: schema.apiTokens.expiresAt,
+      createdAt: schema.apiTokens.createdAt,
+    })
+    .from(schema.apiTokens)
+    .where(eq(schema.apiTokens.userId, viewer.id))
+    .orderBy(desc(schema.apiTokens.createdAt));
+
+  return c.json({ tokens: rows });
+});
+
+usersRoutes.post('/me/tokens', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = createApiTokenSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues[0]?.message || 'Invalid token request' },
+      400
+    );
+  }
+
+  // Cap active tokens per user at 20 to prevent abuse
+  const existing = await db
+    .select({ id: schema.apiTokens.id })
+    .from(schema.apiTokens)
+    .where(eq(schema.apiTokens.userId, viewer.id));
+
+  if (existing.length >= 20) {
+    return c.json(
+      { error: 'Maximum of 20 MCP access tokens reached. Revoke an unused token first.' },
+      400
+    );
+  }
+
+  const rawToken = `kl_mcp_${generateRandomToken(24)}`;
+  const tokenHash = await sha256Hex(rawToken);
+  const tokenPrefix = rawToken.slice(0, 15) + '...';
+  const now = Date.now();
+  const expiresAt = parsed.data.expiresInDays
+    ? now + parsed.data.expiresInDays * 24 * 60 * 60 * 1000
+    : null;
+  const id = generateId('tok');
+
+  await db.insert(schema.apiTokens).values({
+    id,
+    userId: viewer.id,
+    name: parsed.data.name,
+    tokenHash,
+    tokenPrefix,
+    lastUsedAt: null,
+    expiresAt,
+    createdAt: now,
+  });
+
+  return c.json(
+    {
+      token: {
+        id,
+        name: parsed.data.name,
+        tokenPrefix,
+        lastUsedAt: null,
+        expiresAt,
+        createdAt: now,
+      },
+      rawToken,
+    },
+    201
+  );
+});
+
+usersRoutes.delete('/me/tokens/:id', requireAuth, async (c) => {
+  const db = c.get('db');
+  const viewer = c.get('user')!;
+  const id = c.req.param('id')!;
+
+  const rows = await db
+    .select({ id: schema.apiTokens.id })
+    .from(schema.apiTokens)
+    .where(and(eq(schema.apiTokens.id, id), eq(schema.apiTokens.userId, viewer.id)))
+    .limit(1);
+
+  if (!rows[0]) {
+    return c.json({ error: 'Token not found.' }, 404);
+  }
+
+  await db.delete(schema.apiTokens).where(eq(schema.apiTokens.id, id));
   return c.json({ ok: true });
 });
 
